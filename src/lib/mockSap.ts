@@ -21,7 +21,9 @@ export async function submitToSAP(
   rows: DocumentRow[],
   errors: ValidationError[],
   filename: string,
-  uploadedBy: string
+  uploadedBy: string,
+  databaseId?: string,
+  databaseName?: string
 ): Promise<UploadLog> {
   // Simulate network delay
   await new Promise(res => setTimeout(res, 1800))
@@ -59,6 +61,8 @@ export async function submitToSAP(
     status,
     sapReference,
     errors,
+    databaseId,
+    databaseName,
   }
 
   const existing = getLogs()

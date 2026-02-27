@@ -34,6 +34,21 @@ export interface ParseResult {
 
 export type UploadStatus = 'SUCCESS' | 'FAILED' | 'PARTIAL'
 
+export interface Database {
+  id: string
+  name: string
+  description: string
+  environment: 'Production' | 'Staging' | 'Development'
+  // SAP connection details (present on user-added databases)
+  host?: string
+  systemId?: string     // SAP SID, e.g. "PRD"
+  instanceNumber?: string  // e.g. "00"
+  client?: string       // SAP client number, e.g. "100"
+  username?: string
+  password?: string
+  isCustom?: boolean    // true = added by user, false/undefined = built-in
+}
+
 export interface UploadLog {
   id: string
   filename: string
@@ -45,4 +60,6 @@ export interface UploadLog {
   status: UploadStatus
   sapReference?: string
   errors: ValidationError[]
+  databaseId?: string
+  databaseName?: string
 }

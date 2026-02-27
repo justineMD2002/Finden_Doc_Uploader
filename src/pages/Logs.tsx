@@ -49,6 +49,7 @@ export default function Logs() {
       Filename: log.filename,
       'Uploaded By': log.uploadedBy,
       'Uploaded At': formatDateTime(log.uploadedAt),
+      Database: log.databaseName ?? '',
       'Total Rows': log.rowCount,
       'Success': log.successCount,
       'Failed': log.failedCount,
@@ -219,10 +220,11 @@ export default function Logs() {
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-5 pb-4 pt-2 bg-gray-50/80 border-t border-gray-100 space-y-3">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {[
                           { label: 'Log ID', value: log.id },
                           { label: 'Upload Time', value: formatDateTime(log.uploadedAt) },
+                          { label: 'Database', value: log.databaseName ?? '—' },
                           { label: 'SAP Reference', value: log.sapReference ?? '—' },
                           { label: 'Status', value: log.status },
                         ].map(item => (
