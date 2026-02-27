@@ -1,66 +1,58 @@
-import type { Database } from '@/types/document'
+import type { SapServer, Company } from '@/types/document'
 
-const CUSTOM_DB_KEY = 'pixelcare_custom_databases'
+export const SAP_SERVER: SapServer = {
+  dbType: 'MSSQL_2019',
+  serverName: 'pxcserver',
+}
 
-export const BUILTIN_DATABASES: Database[] = [
+export const COMPANIES: Company[] = [
   {
-    id: 'sap-prod-001',
-    name: 'SAP ERP — Production',
-    description: 'Main production ERP system',
-    environment: 'Production',
+    id: 'SBODemoAU',
+    companyName: 'OEC Computers Australia',
+    databaseName: 'SBODemoAU',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
   },
   {
-    id: 'sap-staging-001',
-    name: 'SAP ERP — Staging',
-    description: 'Pre-production staging environment',
-    environment: 'Staging',
+    id: 'OUTLETSLIVE',
+    companyName: 'OUTLET',
+    databaseName: 'OUTLETSLIVE',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
   },
   {
-    id: 'sap-dev-001',
-    name: 'SAP ERP — Development',
-    description: 'Local development & testing',
-    environment: 'Development',
+    id: 'PXC-LIVE_MY_2025',
+    companyName: 'Pixel Pinnacle Technology Sdn. Bhd.',
+    databaseName: 'PXC-LIVE_MY_2025',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
   },
   {
-    id: 'sap-prod-002',
-    name: 'SAP S/4HANA — APAC',
-    description: 'Asia-Pacific regional ERP instance',
-    environment: 'Production',
+    id: 'PXC-LIVE_PH_2025',
+    companyName: 'Pixelcare Consulting Corporation',
+    databaseName: 'PXC-LIVE_PH_2025',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
   },
   {
-    id: 'sap-prod-003',
-    name: 'SAP S/4HANA — EMEA',
-    description: 'Europe, Middle East & Africa ERP instance',
-    environment: 'Production',
+    id: 'PXC-LIVE_SG_2025',
+    companyName: 'Pixelcare Consulting Pte Ltd',
+    databaseName: 'PXC-LIVE_SG_2025',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
+  },
+  {
+    id: 'SASME_LIVEDB',
+    companyName: 'SAS M&E PTE LTD',
+    databaseName: 'SASME_LIVEDB',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
+  },
+  {
+    id: 'E-INVOICING_TEK_LIVE',
+    companyName: 'TEK AUTOMOTIVE MALAYSIA SDN BHD',
+    databaseName: 'E-INVOICING_TEK_LIVE',
+    localization: 'Australia/New Zealand',
+    version: '1000261',
   },
 ]
-
-export const ENV_STYLES: Record<Database['environment'], string> = {
-  Production: 'bg-green-100 text-green-700',
-  Staging: 'bg-amber-100 text-amber-700',
-  Development: 'bg-blue-100 text-blue-700',
-}
-
-export function getCustomDatabases(): Database[] {
-  const raw = localStorage.getItem(CUSTOM_DB_KEY)
-  if (!raw) return []
-  try {
-    return JSON.parse(raw) as Database[]
-  } catch {
-    return []
-  }
-}
-
-export function getAllDatabases(): Database[] {
-  return [...BUILTIN_DATABASES, ...getCustomDatabases()]
-}
-
-export function saveCustomDatabase(db: Database): void {
-  const existing = getCustomDatabases()
-  localStorage.setItem(CUSTOM_DB_KEY, JSON.stringify([...existing, db]))
-}
-
-export function deleteCustomDatabase(id: string): void {
-  const existing = getCustomDatabases().filter(db => db.id !== id)
-  localStorage.setItem(CUSTOM_DB_KEY, JSON.stringify(existing))
-}

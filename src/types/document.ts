@@ -49,6 +49,19 @@ export interface Database {
   isCustom?: boolean    // true = added by user, false/undefined = built-in
 }
 
+export interface SapServer {
+  dbType: string        // e.g. "MSSQL_2019"
+  serverName: string    // e.g. "pxcserver"
+}
+
+export interface Company {
+  id: string
+  companyName: string
+  databaseName: string
+  localization: string
+  version: string
+}
+
 export interface UploadLog {
   id: string
   filename: string

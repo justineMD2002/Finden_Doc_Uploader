@@ -1,16 +1,15 @@
 import { useState } from 'react'
-import { Loader2, Send, RotateCcw, CheckCircle2, XCircle, Database, ChevronDown, Plus, Lock } from 'lucide-react'
+import { Loader2, Send, RotateCcw, CheckCircle2, XCircle, Server } from 'lucide-react'
 import { toast } from 'sonner'
 import { parseFile } from '@/lib/parser'
 import { submitToSAP } from '@/lib/mockSap'
 import { useAuth } from '@/context/AuthContext'
-import type { DocumentRow, ValidationError, UploadLog, Database as DatabaseType } from '@/types/document'
+import type { DocumentRow, ValidationError, UploadLog, Company } from '@/types/document'
 import FormatGuide from '@/components/FormatGuide'
 import FileDropzone from '@/components/FileDropzone'
 import PreviewTable from '@/components/PreviewTable'
-import AddDatabaseModal from '@/components/AddDatabaseModal'
 import { cn } from '@/lib/utils'
-import { getAllDatabases, ENV_STYLES } from '@/lib/databases'
+import { SAP_SERVER, COMPANIES } from '@/lib/databases'
 
 type UploadState = 'idle' | 'parsing' | 'preview' | 'uploading' | 'done'
 
@@ -20,17 +19,13 @@ interface UploadResult {
 
 export default function Upload() {
   const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
 
   const [state, setState] = useState<UploadState>('idle')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [rows, setRows] = useState<DocumentRow[]>([])
   const [errors, setErrors] = useState<ValidationError[]>([])
   const [result, setResult] = useState<UploadResult | null>(null)
-  const [selectedDb, setSelectedDb] = useState<DatabaseType | null>(null)
-  const [dbDropdownOpen, setDbDropdownOpen] = useState(false)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [databases, setDatabases] = useState<DatabaseType[]>(() => getAllDatabases())
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
 
   async function handleFileSelect(file: File) {
     setSelectedFile(file)
@@ -57,7 +52,6 @@ export default function Upload() {
     setRows([])
     setErrors([])
     setResult(null)
-    setDbDropdownOpen(false)
   }
 
   async function handleUpload() {
@@ -65,7 +59,7 @@ export default function Upload() {
     setState('uploading')
 
     try {
-      const log = await submitToSAP(rows, errors, selectedFile.name, user.name, selectedDb?.id, selectedDb?.name)
+      const log = await submitToSAP(rows, errors, selectedFile.name, user.name, selectedCompany?.id, selectedCompany?.companyName)
       setResult({ log })
       setState('done')
 
@@ -91,21 +85,9 @@ export default function Upload() {
     }
   }
 
-  function handleDatabaseAdded(db: DatabaseType) {
-    setDatabases(getAllDatabases())
-    setSelectedDb(db)
-    toast.success(`Database "${db.name}" added`, { description: 'It has been selected as the target database.' })
-  }
-
   const isParsing = state === 'parsing'
   const isUploading = state === 'uploading'
   const showPreview = state === 'preview' || state === 'uploading' || state === 'done'
-
-  // Group databases by environment for the dropdown
-  const grouped = (['Production', 'Staging', 'Development'] as const).map(env => ({
-    env,
-    items: databases.filter(db => db.environment === env),
-  })).filter(g => g.items.length > 0)
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-6">
@@ -115,102 +97,88 @@ export default function Upload() {
         <p className="text-sm text-gray-500 mt-1">Upload CSV or Excel files to send document data to SAP</p>
       </div>
 
-      {/* Database Selector */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-3">
-        <div className="flex items-center gap-2">
-          <Database className="w-4 h-4 text-brand-600" />
-          <h2 className="text-base font-semibold text-gray-800">Target Database</h2>
-          {!selectedDb && (
-            <span className="ml-auto text-xs text-amber-600 font-medium bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">Required</span>
+      {/* Company Selector — SAP B1 style */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* Server banner */}
+        <div className="flex items-center gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100">
+          <Server className="w-4 h-4 text-brand-600 flex-shrink-0" />
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Current Server</span>
+          <span className="text-xs font-mono font-semibold text-gray-800 bg-white border border-gray-200 rounded px-2 py-0.5">
+            {SAP_SERVER.dbType}
+          </span>
+          <span className="text-gray-300">—</span>
+          <span className="text-xs font-semibold text-brand-700">{SAP_SERVER.serverName}</span>
+          {!selectedCompany && (
+            <span className="ml-auto text-xs text-amber-600 font-medium bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+              Select a company
+            </span>
           )}
         </div>
 
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setDbDropdownOpen(o => !o)}
-            disabled={isUploading || state === 'done'}
-            className={cn(
-              'w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-sm transition-all',
-              selectedDb
-                ? 'border-brand-300 bg-brand-50 text-gray-800'
-                : 'border-gray-200 bg-gray-50 text-gray-400',
-              'hover:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500',
-              (isUploading || state === 'done') && 'opacity-60 cursor-not-allowed pointer-events-none'
-            )}
-          >
-            {selectedDb ? (
-              <span className="flex items-center gap-3 min-w-0">
-                <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0', ENV_STYLES[selectedDb.environment])}>
-                  {selectedDb.environment}
-                </span>
-                <span className="font-medium truncate">{selectedDb.name}</span>
-                <span className="text-xs text-gray-400 truncate hidden sm:block">{selectedDb.description}</span>
-              </span>
-            ) : (
-              <span>Select a database to upload into...</span>
-            )}
-            <ChevronDown className={cn('w-4 h-4 flex-shrink-0 text-gray-400 transition-transform', dbDropdownOpen && 'rotate-180')} />
-          </button>
-
-          {dbDropdownOpen && (
-            <div className="absolute z-20 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
-              {/* Database list grouped by environment */}
-              {grouped.map(({ env, items }) => (
-                <div key={env}>
-                  <div className="px-4 pt-2.5 pb-1">
-                    <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', ENV_STYLES[env])}>
-                      {env}
-                    </span>
-                  </div>
-                  {items.map(db => (
-                    <button
-                      key={db.id}
-                      type="button"
-                      onClick={() => { setSelectedDb(db); setDbDropdownOpen(false) }}
-                      className={cn(
-                        'w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors',
-                        selectedDb?.id === db.id && 'bg-brand-50'
-                      )}
-                    >
-                      <span className="flex flex-col min-w-0 flex-1">
-                        <span className="font-medium text-gray-900 flex items-center gap-1.5">
-                          {db.name}
-                          {db.isCustom && (
-                            <span className="text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">custom</span>
-                          )}
-                        </span>
-                        <span className="text-xs text-gray-400">{db.description}</span>
-                      </span>
-                      {selectedDb?.id === db.id && (
-                        <CheckCircle2 className="w-4 h-4 text-brand-600 flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              ))}
-
-              {/* Divider + Add button (admin only) */}
-              <div className="border-t border-gray-100">
-                {isAdmin ? (
-                  <button
-                    type="button"
-                    onClick={() => { setDbDropdownOpen(false); setShowAddModal(true) }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-brand-600 hover:bg-brand-50 font-medium transition-colors"
+        {/* Company table */}
+        <div className={cn('overflow-x-auto', (isUploading || state === 'done') && 'pointer-events-none opacity-60')}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <th className="text-left px-6 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8"></th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Company Name</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Database Name</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Localization</th>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPANIES.map((company, idx) => {
+                const isSelected = selectedCompany?.id === company.id
+                return (
+                  <tr
+                    key={company.id}
+                    onClick={() => setSelectedCompany(company)}
+                    className={cn(
+                      'cursor-pointer transition-colors',
+                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50',
+                      isSelected
+                        ? 'bg-brand-50 hover:bg-brand-50'
+                        : 'hover:bg-brand-50/60'
+                    )}
                   >
-                    <Plus className="w-4 h-4" />
-                    Add New Database
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2 px-4 py-3 text-xs text-gray-400">
-                    <Lock className="w-3.5 h-3.5" />
-                    Contact an admin to add a new database
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+                    <td className="px-6 py-3 w-8">
+                      <span className={cn(
+                        'flex items-center justify-center w-4 h-4 rounded-full border-2 transition-all',
+                        isSelected
+                          ? 'border-brand-600 bg-brand-600'
+                          : 'border-gray-300'
+                      )}>
+                        {isSelected && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-white block" />
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn('font-medium', isSelected ? 'text-brand-800' : 'text-gray-800')}>
+                        {company.companyName}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{company.databaseName}</td>
+                    <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{company.localization}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500 hidden sm:table-cell">{company.version}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
+
+        {/* Selected company summary */}
+        {selectedCompany && (
+          <div className="px-6 py-3 border-t border-brand-100 bg-brand-50 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-brand-600 flex-shrink-0" />
+            <span className="text-xs text-brand-700">
+              Selected: <span className="font-semibold">{selectedCompany.companyName}</span>
+              <span className="text-brand-500 ml-1">({selectedCompany.databaseName})</span>
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Format Guide */}
@@ -274,11 +242,11 @@ export default function Upload() {
                 </button>
                 <button
                   onClick={handleUpload}
-                  disabled={rows.length === 0 || !selectedDb}
-                  title={!selectedDb ? 'Please select a target database first' : undefined}
+                  disabled={rows.length === 0 || !selectedCompany}
+                  title={!selectedCompany ? 'Please select a company first' : undefined}
                   className={cn(
                     'flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-sm',
-                    !selectedDb
+                    !selectedCompany
                       ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                       : errors.length > 0
                       ? 'bg-amber-500 hover:bg-amber-600 text-white'
@@ -296,7 +264,7 @@ export default function Upload() {
             <div className="flex items-center gap-3 px-4 py-3 bg-brand-50 rounded-xl border border-brand-100">
               <Loader2 className="w-4 h-4 text-brand-600 animate-spin" />
               <span className="text-sm text-brand-700 font-medium">
-                Submitting to {selectedDb?.name ?? 'SAP'}... Please wait
+                Submitting to {selectedCompany?.companyName ?? 'SAP'}... Please wait
               </span>
             </div>
           )}
@@ -333,7 +301,7 @@ export default function Upload() {
               <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: 'File', value: result.log.filename },
-                  { label: 'Database', value: result.log.databaseName ?? '—' },
+                  { label: 'Company', value: result.log.databaseName ?? '—' },
                   { label: 'Succeeded', value: result.log.successCount },
                   { label: 'Failed', value: result.log.failedCount },
                 ].map(item => (
@@ -361,13 +329,6 @@ export default function Upload() {
         </div>
       )}
 
-      {/* Add Database Modal (admin only) */}
-      {showAddModal && (
-        <AddDatabaseModal
-          onClose={() => setShowAddModal(false)}
-          onAdded={handleDatabaseAdded}
-        />
-      )}
     </div>
   )
 }
