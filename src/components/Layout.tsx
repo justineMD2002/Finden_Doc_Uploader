@@ -30,7 +30,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <FileSpreadsheet className="w-5 h-5 text-white" />
             </div>
             <div>
-              <p className="text-sm font-700 text-gray-900 font-semibold leading-tight">Pixelcare</p>
+              <p className="text-sm font-700 text-gray-900 font-semibold leading-tight">Finden</p>
               <p className="text-xs text-gray-400">Doc Uploader</p>
             </div>
           </div>

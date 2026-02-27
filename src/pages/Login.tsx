@@ -42,17 +42,17 @@ export default function Login() {
           <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur">
             <FileSpreadsheet className="w-6 h-6 text-white" />
           </div>
-          <span className="text-white font-semibold text-lg">Pixelcare</span>
+          <span className="text-white font-semibold text-lg">Finden SAP B1 Web Document Uploader</span>
         </div>
 
         <div className="space-y-6">
           <div className="space-y-3">
             <h1 className="text-4xl font-bold text-white leading-tight">
               Document Uploader<br />
-              <span className="text-brand-200">for SAP Integration</span>
+              <span className="text-brand-200">for SAP B1 Integration</span>
             </h1>
             <p className="text-brand-200 text-lg leading-relaxed max-w-md">
-              Upload your invoices, purchase orders, and financial documents directly to SAP — with real-time validation and full audit logs.
+              Upload your invoices, purchase orders, and financial documents directly to SAP B1 with real-time validation and full audit logs.
             </p>
           </div>
 
@@ -70,7 +70,7 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="text-brand-400 text-sm">© 2025 Pixelcare. All rights reserved.</p>
+        <p className="text-brand-400 text-sm">© 2026 Pixelcare Consulting. All rights reserved.</p>
       </div>
 
       {/* Right panel - login form */}
