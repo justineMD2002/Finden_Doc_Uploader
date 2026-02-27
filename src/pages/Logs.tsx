@@ -19,13 +19,22 @@ export default function Logs() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'PARTIAL' | 'FAILED'>('ALL')
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [justRefreshed, setJustRefreshed] = useState(false)
 
   function refresh() {
-    setLogs(getLogs())
+    setIsRefreshing(true)
+    setJustRefreshed(false)
+    setTimeout(() => {
+      setLogs(getLogs())
+      setIsRefreshing(false)
+      setJustRefreshed(true)
+      setTimeout(() => setJustRefreshed(false), 2000)
+    }, 600)
   }
 
   useEffect(() => {
-    refresh()
+    setLogs(getLogs())
   }, [])
 
   function clearLogs() {
@@ -95,10 +104,17 @@ export default function Logs() {
           </button>
           <button
             onClick={refresh}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            disabled={isRefreshing}
+            className={cn(
+              'flex items-center gap-2 px-3 py-2 text-sm border rounded-xl transition-all duration-200',
+              justRefreshed
+                ? 'border-green-300 bg-green-50 text-green-700'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+              isRefreshing && 'opacity-70 cursor-not-allowed'
+            )}
           >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
+            <RefreshCw className={cn('w-4 h-4 transition-transform duration-500', isRefreshing && 'animate-spin')} />
+            {isRefreshing ? 'Refreshing...' : justRefreshed ? 'Updated!' : 'Refresh'}
           </button>
         </div>
       </div>
