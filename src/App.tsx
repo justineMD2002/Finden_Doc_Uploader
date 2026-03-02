@@ -30,10 +30,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/validate" replace /> : <Login />} />
+      <Route path="/login" element={user ? <Navigate to="/upload-doc" replace /> : <Login />} />
       <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
-      <Route path="/validate" element={<ProtectedRoute><Validate /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to={user ? '/validate' : '/login'} replace />} />
+      <Route path="/upload-doc" element={<ProtectedRoute><Validate /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to={user ? '/upload-doc' : '/login'} replace />} />
     </Routes>
   )
 }

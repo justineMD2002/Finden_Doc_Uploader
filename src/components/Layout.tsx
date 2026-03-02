@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const navItems = [
-  { to: '/validate', label: 'Upload Document', icon: UploadCloud },
+  { to: '/upload-doc', label: 'Upload Document', icon: UploadCloud },
   { to: '/logs', label: 'Upload Logs', icon: ClipboardList },
 ]
 
