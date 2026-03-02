@@ -1,4 +1,4 @@
-import type { DocumentRow, UploadLog, ValidationError } from '@/types/document'
+import type { UploadLog, ValidationError } from '@/types/document'
 import { generateId } from '@/lib/utils'
 
 const LOGS_KEY = 'pixelcare_upload_logs'
@@ -18,12 +18,13 @@ function saveLogs(logs: UploadLog[]) {
 }
 
 export async function submitToSAP(
-  rows: DocumentRow[],
+  rows: Record<string, unknown>[],
   errors: ValidationError[],
   filename: string,
   uploadedBy: string,
   databaseId?: string,
-  databaseName?: string
+  databaseName?: string,
+  module?: string,
 ): Promise<UploadLog> {
   // Simulate network delay
   await new Promise(res => setTimeout(res, 1800))
@@ -63,6 +64,7 @@ export async function submitToSAP(
     errors,
     databaseId,
     databaseName,
+    module,
   }
 
   const existing = getLogs()

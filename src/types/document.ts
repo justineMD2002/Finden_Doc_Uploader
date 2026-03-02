@@ -75,4 +75,5 @@ export interface UploadLog {
   errors: ValidationError[]
   databaseId?: string
   databaseName?: string
+  module?: string
 }

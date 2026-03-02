@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import {
   CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronRight,
-  RefreshCw, Search, FileDown, Trash2, ClipboardList
+  RefreshCw, Search, FileDown, ClipboardList
 } from 'lucide-react'
 import { getLogs } from '@/lib/mockSap'
 import type { UploadLog } from '@/types/document'
@@ -37,12 +37,6 @@ export default function Logs() {
     setLogs(getLogs())
   }, [])
 
-  function clearLogs() {
-    if (!confirm('Clear all upload logs? This cannot be undone.')) return
-    localStorage.removeItem('pixelcare_upload_logs')
-    setLogs([])
-  }
-
   function exportLogs() {
     const data = filtered.map(log => ({
       ID: log.id,
@@ -74,7 +68,7 @@ export default function Logs() {
   const stats = {
     total: logs.length,
     success: logs.filter(l => l.status === 'SUCCESS').length,
-    partial: logs.filter(l => l.status === 'PARTIAL').length,
+    // partial: logs.filter(l => l.status === 'PARTIAL').length,
     failed: logs.filter(l => l.status === 'FAILED').length,
   }
 
@@ -95,6 +89,7 @@ export default function Logs() {
             <FileDown className="w-4 h-4" />
             Export
           </button>
+          {/* Clear button hidden for now — uncomment to re-enable
           <button
             onClick={clearLogs}
             disabled={logs.length === 0}
@@ -103,6 +98,7 @@ export default function Logs() {
             <Trash2 className="w-4 h-4" />
             Clear
           </button>
+          */}
           <button
             onClick={refresh}
             disabled={isRefreshing}
@@ -125,7 +121,7 @@ export default function Logs() {
         {[
           { label: 'Total Uploads', value: stats.total, cls: 'text-gray-800', bg: 'bg-white' },
           { label: 'Successful', value: stats.success, cls: 'text-green-700', bg: 'bg-green-50' },
-          { label: 'Partial', value: stats.partial, cls: 'text-amber-700', bg: 'bg-amber-50' },
+          // { label: 'Partial', value: stats.partial, cls: 'text-amber-700', bg: 'bg-amber-50' },
           { label: 'Failed', value: stats.failed, cls: 'text-red-700', bg: 'bg-red-50' },
         ].map(s => (
           <div key={s.label} className={cn('rounded-xl border border-gray-100 shadow-sm p-4', s.bg)}>
@@ -147,7 +143,7 @@ export default function Logs() {
           />
         </div>
         <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1">
-          {(['ALL', 'SUCCESS', 'PARTIAL', 'FAILED'] as const).map(s => (
+          {(['ALL', 'SUCCESS', 'FAILED'] as const).map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
@@ -175,50 +171,57 @@ export default function Logs() {
             <p className="text-xs text-gray-400 mt-1">{logs.length === 0 ? 'Upload a document to see logs here.' : 'Try adjusting your search or filters.'}</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {/* Table header */}
-            <div className="grid grid-cols-[auto_1fr_1fr_auto_auto_auto_auto_auto] gap-4 px-5 py-3 bg-gray-50 text-xs font-semibold text-gray-500">
-              <span className="w-5" />
-              <span>Filename</span>
-              <span>Uploaded By</span>
-              <span>Date</span>
-              <span>Rows</span>
-              <span>Success</span>
-              <span>Failed</span>
-              <span>Status</span>
-            </div>
-
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500">
+                <th className="w-8 px-5 py-3" />
+                <th className="text-left px-3 py-3">Filename</th>
+                <th className="text-left px-3 py-3">Uploaded By</th>
+                <th className="text-left px-3 py-3 whitespace-nowrap">Date</th>
+                <th className="text-center px-3 py-3">Rows</th>
+                <th className="text-center px-3 py-3">Success</th>
+                <th className="text-center px-3 py-3">Failed</th>
+                <th className="text-left px-3 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
             {filtered.map(log => {
               const cfg = STATUS_CONFIG[log.status]
               const StatusIcon = cfg.icon
               const isExpanded = expandedId === log.id
 
               return (
-                <div key={log.id}>
-                  <button
+                <Fragment key={log.id}>
+                  <tr
                     onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                    className="grid grid-cols-[auto_1fr_1fr_auto_auto_auto_auto_auto] gap-4 w-full px-5 py-3.5 text-left hover:bg-gray-50 transition-colors items-center"
+                    className="hover:bg-gray-50 transition-colors cursor-pointer"
                   >
-                    <span className="text-gray-400">
+                    <td className="px-5 py-3.5 text-gray-400 w-8">
                       {isExpanded
                         ? <ChevronDown className="w-4 h-4 text-gray-500" />
                         : <ChevronRight className="w-4 h-4" />
                       }
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{log.filename}</span>
-                    <span className="text-sm text-gray-600">{log.uploadedBy}</span>
-                    <span className="text-xs text-gray-400 whitespace-nowrap">{formatDate(log.uploadedAt)}</span>
-                    <span className="text-sm text-gray-700 text-center">{log.rowCount}</span>
-                    <span className="text-sm text-green-600 font-medium text-center">{log.successCount}</span>
-                    <span className={cn('text-sm font-medium text-center', log.failedCount > 0 ? 'text-red-500' : 'text-gray-400')}>{log.failedCount}</span>
-                    <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium w-fit', cfg.cls)}>
-                      <StatusIcon className="w-3 h-3" />
-                      {cfg.label}
-                    </span>
-                  </button>
+                    </td>
+                    <td className="px-3 py-3.5 text-sm font-medium text-gray-900 max-w-[220px]">
+                      <span className="block truncate">{log.filename}</span>
+                    </td>
+                    <td className="px-3 py-3.5 text-sm text-gray-600 whitespace-nowrap">{log.uploadedBy}</td>
+                    <td className="px-3 py-3.5 text-xs text-gray-400 whitespace-nowrap">{formatDate(log.uploadedAt)}</td>
+                    <td className="px-3 py-3.5 text-sm text-gray-700 text-center">{log.rowCount}</td>
+                    <td className="px-3 py-3.5 text-sm text-green-600 font-medium text-center">{log.successCount}</td>
+                    <td className={cn('px-3 py-3.5 text-sm font-medium text-center', log.failedCount > 0 ? 'text-red-500' : 'text-gray-400')}>{log.failedCount}</td>
+                    <td className="px-3 py-3.5">
+                      <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium w-fit', cfg.cls)}>
+                        <StatusIcon className="w-3 h-3" />
+                        {cfg.label}
+                      </span>
+                    </td>
+                  </tr>
 
                   {/* Expanded detail */}
                   {isExpanded && (
+                  <tr>
+                    <td colSpan={8} className="p-0">
                     <div className="px-5 pb-4 pt-2 bg-gray-50/80 border-t border-gray-100 space-y-3">
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {[
@@ -250,11 +253,14 @@ export default function Logs() {
                         </div>
                       )}
                     </div>
+                  </td>
+                  </tr>
                   )}
-                </div>
+                </Fragment>
               )
             })}
-          </div>
+            </tbody>
+          </table>
         )}
       </div>
     </div>

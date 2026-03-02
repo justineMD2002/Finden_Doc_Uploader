@@ -2,8 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import Login from '@/pages/Login'
-import Upload from '@/pages/Upload'
 import Logs from '@/pages/Logs'
+import Validate from '@/pages/Validate'
 import Layout from '@/components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -30,10 +30,10 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/upload" replace /> : <Login />} />
-      <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+      <Route path="/login" element={user ? <Navigate to="/validate" replace /> : <Login />} />
       <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to={user ? '/upload' : '/login'} replace />} />
+      <Route path="/validate" element={<ProtectedRoute><Validate /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to={user ? '/validate' : '/login'} replace />} />
     </Routes>
   )
 }
