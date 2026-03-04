@@ -3,7 +3,7 @@ import { Toaster } from 'sonner'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import Login from '@/pages/Login'
 import Logs from '@/pages/Logs'
-import Validate from '@/pages/Validate'
+import Import from '@/pages/Import'
 import Layout from '@/components/Layout'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,7 +32,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/upload-doc" replace /> : <Login />} />
       <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
-      <Route path="/upload-doc" element={<ProtectedRoute><Validate /></ProtectedRoute>} />
+      <Route path="/upload-doc" element={<ProtectedRoute><Import /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to={user ? '/upload-doc' : '/login'} replace />} />
     </Routes>
   )

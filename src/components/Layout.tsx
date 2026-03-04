@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const navItems = [
-  { to: '/upload-doc', label: 'Upload Document', icon: UploadCloud },
-  { to: '/logs', label: 'Upload Logs', icon: ClipboardList },
+  { to: '/upload-doc', label: 'Data Import', icon: UploadCloud },
+  { to: '/logs', label: 'Import Logs', icon: ClipboardList },
 ]
 
 // ─── Profile drawer ────────────────────────────────────────────────────────
@@ -226,7 +226,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2.5 shrink-0">
             <img src={findenLogo} alt="Finden" className="h-16 w-auto" />
             <span className="text-gray-300 text-xs">|</span>
-            <span className="text-xs text-gray-400">Doc Uploader</span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-xs font-semibold text-gray-700">SAP B1 Data Transfer Workbench</span>
+              <span className="text-[10px] text-gray-400">Web</span>
+            </div>
           </div>
 
           {/* Nav links */}
