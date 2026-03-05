@@ -2,10 +2,11 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   ClipboardList, LogOut, UploadCloud,
-  User, ChevronDown, X, Save, Loader2,
+  User, ChevronDown, X, Save, Loader2, Database, RefreshCw,
 } from 'lucide-react'
 import findenLogo from '@/assets/finden_logo.png'
 import { useAuth } from '@/context/AuthContext'
+import { useSap } from '@/context/SapContext'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -215,6 +216,37 @@ function UserMenu() {
   )
 }
 
+// ─── SAP company badge ─────────────────────────────────────────────────────
+
+function SapBadge() {
+  const { company, disconnect } = useSap()
+  const navigate = useNavigate()
+
+  async function handleSwitch() {
+    await disconnect()
+    navigate('/select-company')
+  }
+
+  if (!company) return null
+
+  return (
+    <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-xl shrink-0">
+      <Database className="w-3.5 h-3.5 text-green-600 shrink-0" />
+      <div className="leading-tight">
+        <p className="text-[10px] text-green-600 font-medium">Connected</p>
+        <p className="text-xs font-semibold text-green-800 max-w-[140px] truncate">{company.companyName}</p>
+      </div>
+      <button
+        onClick={handleSwitch}
+        title="Switch company"
+        className="ml-1 p-1 rounded-md hover:bg-green-100 text-green-600 hover:text-green-800 transition-colors"
+      >
+        <RefreshCw className="w-3 h-3" />
+      </button>
+    </div>
+  )
+}
+
 // ─── Layout ────────────────────────────────────────────────────────────────
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -256,6 +288,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </NavLink>
             ))}
           </nav>
+
+          {/* SAP company badge */}
+          <SapBadge />
 
           {/* User menu */}
           <UserMenu />

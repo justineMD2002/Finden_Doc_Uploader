@@ -25,6 +25,8 @@ import {
 } from '@/lib/wizardStorage'
 import { insertImportLog } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { useSap } from '@/context/SapContext'
+import { runSapTest, runSapImport } from '@/lib/sapService'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1244,11 +1246,18 @@ function StepImport({
   const [running, setRunning] = useState<'test' | 'import' | null>(null)
   const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
   const mappedCount = mappings.filter(m => m.targetField.trim()).length
+  const { session } = useSap()
 
   async function run(mode: 'test' | 'import') {
+    if (mode === 'import' && !session) {
+      toast.error('No active SAP session', { description: 'Please reconnect to SAP from the company selector.' })
+      return
+    }
     setRunning(mode)
     try {
-      const r = await mockRunImport(mode, docFile, errorHandling)
+      const r = mode === 'test'
+        ? await runSapTest(bizObject.id, docFile, linesFile, mappings)
+        : await runSapImport(bizObject.id, docFile, linesFile, mappings, session!.sessionId)
       onResult(r)
       if (mode === 'import') {
         if (r.status === 'success') toast.success('Import completed successfully!', { description: `SAP Ref: ${r.sapReference}` })
