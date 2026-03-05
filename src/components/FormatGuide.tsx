@@ -16,7 +16,7 @@ const COLUMNS = [
   { name: 'unit', type: 'String', required: true, example: 'EA', desc: 'EA | KG | BOX | PC | L | M' },
   { name: 'unit_price', type: 'Number', required: true, example: '1250.00', desc: 'Price per unit (2 decimal places)' },
   { name: 'currency', type: 'String', required: true, example: 'PHP', desc: 'ISO currency code (PHP, USD, EUR, etc.)' },
-  { name: 'total_amount', type: 'Number', required: true, example: '6250.00', desc: 'Must equal quantity × unit_price' },
+  { name: 'total_amount', type: 'Nu mber', required: true, example: '6250.00', desc: 'Must equal quantity × unit_price' },
   { name: 'tax_code', type: 'String', required: true, example: 'V1', desc: 'SAP Tax code' },
   { name: 'cost_center', type: 'String', required: true, example: 'CC-1001', desc: 'SAP Cost center code' },
   { name: 'remarks', type: 'String', required: false, example: 'Urgent delivery', desc: 'Optional notes' },

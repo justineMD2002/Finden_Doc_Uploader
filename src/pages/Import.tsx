@@ -3,7 +3,7 @@ import {
   TrendingUp, ShoppingCart, Package, ChevronRight, ChevronLeft,
   UploadCloud, FileSpreadsheet, X, CheckCircle2, XCircle, Loader2,
   ArrowRight, AlertTriangle, FlaskConical, Send, RotateCcw, Check,
-  AlertCircle,
+  AlertCircle, Info, Wand2,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -14,6 +14,11 @@ import {
   type MappingRow, type ErrorHandlingMode,
   type UploadedFile, type WizardStep, type ImportResult,
 } from '@/types/wizard'
+import {
+  getBizObjectConfig, applyAutoMap, reAutoMap, validateMappedRows,
+  type SapFieldDef, type BizObjectConfig,
+} from '@/lib/sapFields'
+import type { CellValidationError } from '@/types/wizard'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -23,19 +28,16 @@ function categoryIcon(id: BizCategory) {
   return <Package className="w-5 h-5" />
 }
 
-async function readFileColumns(file: File): Promise<{ columns: string[]; rowCount: number }> {
+async function readFile(file: File): Promise<{ columns: string[]; rowCount: number; rows: Record<string, unknown>[] }> {
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, { cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null })
   const columns = rows.length > 0 ? Object.keys(rows[0]) : []
-  return { columns, rowCount: rows.length }
+  return { columns, rowCount: rows.length, rows }
 }
 
-function buildInitialMappings(
-  docCols: string[],
-  linesCols: string[],
-): MappingRow[] {
+function buildFallbackMappings(docCols: string[], linesCols: string[]): MappingRow[] {
   return [
     ...docCols.map(c => ({ sourceField: c, targetField: '', tab: 'doc' as const })),
     ...linesCols.map(c => ({ sourceField: c, targetField: '', tab: 'lines' as const })),
@@ -44,13 +46,7 @@ function buildInitialMappings(
 
 // ─── Progress bar ──────────────────────────────────────────────────────────
 
-const STEP_LABELS = [
-  'Business Object',
-  'Upload Files',
-  'Field Mapping',
-  'Error Handling',
-  'Import',
-]
+const STEP_LABELS = ['Business Object', 'Upload Files', 'Field Mapping', 'Error Handling', 'Import']
 
 function WizardProgress({ step }: { step: WizardStep }) {
   return (
@@ -64,9 +60,9 @@ function WizardProgress({ step }: { step: WizardStep }) {
             <div className="flex flex-col items-center gap-1.5">
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all border-2',
-                done  ? 'bg-brand-600 border-brand-600 text-white'
-                      : active ? 'bg-white border-brand-500 text-brand-600 ring-4 ring-brand-100'
-                      : 'bg-white border-gray-200 text-gray-400',
+                done   ? 'bg-brand-600 border-brand-600 text-white'
+                : active ? 'bg-white border-brand-500 text-brand-600 ring-4 ring-brand-100'
+                : 'bg-white border-gray-200 text-gray-400',
               )}>
                 {done ? <Check className="w-4 h-4" /> : n}
               </div>
@@ -91,9 +87,7 @@ function WizardProgress({ step }: { step: WizardStep }) {
 // ─── Step 1 — Business Object ──────────────────────────────────────────────
 
 function StepBusinessObject({
-  selected,
-  onSelect,
-  onNext,
+  selected, onSelect, onNext,
 }: {
   selected: BizObject | null
   onSelect: (o: BizObject) => void
@@ -113,25 +107,27 @@ function StepBusinessObject({
           const objects = BIZ_OBJECTS.filter(o => o.category === cat.id)
           return (
             <div key={cat.id}>
-              {/* Category header */}
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center">
                   {categoryIcon(cat.id)}
                 </div>
                 <h3 className="text-sm font-semibold text-gray-700">{cat.label}</h3>
               </div>
-
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pl-2">
                 {objects.map(obj => {
                   const isSelected = selected?.id === obj.id
+                  const isEnabled = !!getBizObjectConfig(obj.id)
                   return (
                     <button
                       key={obj.id}
                       type="button"
-                      onClick={() => onSelect(obj)}
+                      disabled={!isEnabled}
+                      onClick={() => isEnabled && onSelect(obj)}
                       className={cn(
-                        'text-left px-4 py-3.5 rounded-xl border-2 text-sm font-medium transition-all',
-                        isSelected
+                        'text-left px-4 py-3.5 rounded-xl border-2 text-sm font-medium transition-all relative',
+                        !isEnabled
+                          ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                          : isSelected
                           ? 'border-brand-500 bg-brand-50 text-brand-700 shadow-sm ring-2 ring-brand-100'
                           : 'border-gray-200 bg-white text-gray-700 hover:border-brand-300 hover:bg-brand-50/40',
                       )}
@@ -144,6 +140,16 @@ function StepBusinessObject({
                           </div>
                         )}
                       </div>
+                      {isEnabled && !isSelected && (
+                        <span className="mt-1.5 inline-block text-[10px] font-semibold text-green-600 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
+                          Available
+                        </span>
+                      )}
+                      {!isEnabled && (
+                        <span className="mt-1.5 inline-block text-[10px] font-semibold text-gray-400 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
+                          Coming soon
+                        </span>
+                      )}
                     </button>
                   )
                 })}
@@ -153,7 +159,6 @@ function StepBusinessObject({
         })}
       </div>
 
-      {/* Footer */}
       <div className="flex justify-end pt-2">
         <button
           onClick={onNext}
@@ -167,14 +172,58 @@ function StepBusinessObject({
   )
 }
 
-// ─── Dropzone (compact) ────────────────────────────────────────────────────
+// ─── Validation error table ────────────────────────────────────────────────
+
+const ERRORS_PER_PAGE = 50
+
+function ValidationErrorTable({ errors }: { errors: CellValidationError[] }) {
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(errors.length / ERRORS_PER_PAGE)
+  const slice = errors.slice(page * ERRORS_PER_PAGE, (page + 1) * ERRORS_PER_PAGE)
+
+  return (
+    <div className="space-y-2">
+      {totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2 text-xs text-gray-500">
+          <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+            className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40">Prev</button>
+          <span>Page {page + 1} / {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
+            className="px-2 py-1 rounded border border-gray-200 hover:bg-gray-50 disabled:opacity-40">Next</button>
+        </div>
+      )}
+      <div className="overflow-x-auto rounded-xl border border-red-200">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-red-50 border-b border-red-200">
+              <th className="text-left px-3 py-2 font-semibold text-red-700 w-14">Row</th>
+              <th className="text-left px-3 py-2 font-semibold text-red-700 w-40">Source Column</th>
+              <th className="text-left px-3 py-2 font-semibold text-red-700 w-32">SAP Field</th>
+              <th className="text-left px-3 py-2 font-semibold text-red-700 w-36">Value</th>
+              <th className="text-left px-3 py-2 font-semibold text-red-700">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {slice.map((err, i) => (
+              <tr key={i} className={cn('border-b border-red-100 last:border-0', i % 2 === 0 ? 'bg-white' : 'bg-red-50/30')}>
+                <td className="px-3 py-2 font-mono text-gray-500">{err.row}</td>
+                <td className="px-3 py-2 font-mono text-brand-700 truncate max-w-[160px]" title={err.sourceColumn}>{err.sourceColumn}</td>
+                <td className="px-3 py-2 font-mono font-semibold text-gray-700">{err.targetField}</td>
+                <td className="px-3 py-2 font-mono text-red-600 truncate max-w-[144px]" title={err.value || '(empty)'}>{err.value || <span className="italic text-gray-400">empty</span>}</td>
+                <td className="px-3 py-2 text-gray-700">{err.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Dropzone ──────────────────────────────────────────────────────────────
 
 function UploadDropzone({
-  label,
-  uploaded,
-  onFile,
-  onRemove,
-  disabled,
+  label, uploaded, onFile, onRemove, disabled,
 }: {
   label: string
   uploaded: UploadedFile | null
@@ -201,15 +250,10 @@ function UploadDropzone({
         <FileSpreadsheet className="w-5 h-5 text-green-600 shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-800 truncate">{uploaded.file.name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {uploaded.rowCount} rows · {uploaded.columns.length} columns
-          </p>
+          <p className="text-xs text-gray-500 mt-0.5">{uploaded.rowCount} rows · {uploaded.columns.length} columns</p>
         </div>
         {!disabled && (
-          <button
-            onClick={onRemove}
-            className="p-1.5 rounded-lg hover:bg-green-100 text-green-700 hover:text-green-900 transition-colors"
-          >
+          <button onClick={onRemove} className="p-1.5 rounded-lg hover:bg-green-100 text-green-700 hover:text-green-900 transition-colors">
             <X className="w-4 h-4" />
           </button>
         )}
@@ -221,63 +265,41 @@ function UploadDropzone({
     <div
       onDragOver={e => { e.preventDefault(); if (!disabled) setDragging(true) }}
       onDragLeave={() => setDragging(false)}
-      onDrop={e => {
-        e.preventDefault()
-        setDragging(false)
-        if (!disabled) handle(e.dataTransfer.files[0])
-      }}
+      onDrop={e => { e.preventDefault(); setDragging(false); if (!disabled) handle(e.dataTransfer.files[0]) }}
       onClick={() => !disabled && inputRef.current?.click()}
       className={cn(
         'rounded-xl border-2 border-dashed px-6 py-8 flex flex-col items-center gap-2 cursor-pointer select-none transition-all',
-        disabled
-          ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-50'
-          : dragging
-          ? 'border-brand-400 bg-brand-50 scale-[1.01]'
+        disabled ? 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-50'
+          : dragging ? 'border-brand-400 bg-brand-50 scale-[1.01]'
           : 'border-gray-200 bg-white hover:border-brand-300 hover:bg-brand-50/30',
       )}
     >
-      <div className={cn(
-        'w-10 h-10 rounded-xl flex items-center justify-center',
-        dragging ? 'bg-brand-100' : 'bg-gray-100',
-      )}>
+      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', dragging ? 'bg-brand-100' : 'bg-gray-100')}>
         <UploadCloud className={cn('w-5 h-5', dragging ? 'text-brand-600' : 'text-gray-400')} />
       </div>
       <div className="text-center">
-        <p className="text-sm font-semibold text-gray-700">
-          {dragging ? 'Drop to upload' : `Upload ${label}`}
-        </p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          Drag & drop or <span className="text-brand-600 font-medium">browse</span>
-        </p>
+        <p className="text-sm font-semibold text-gray-700">{dragging ? 'Drop to upload' : `Upload ${label}`}</p>
+        <p className="text-xs text-gray-400 mt-0.5">Drag & drop or <span className="text-brand-600 font-medium">browse</span></p>
         <p className="text-xs text-gray-300 mt-0.5">.xlsx · .xls · .csv</p>
       </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".xlsx,.xls,.csv"
-        className="hidden"
-        onChange={e => handle(e.target.files?.[0])}
-      />
+      <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => handle(e.target.files?.[0])} />
     </div>
   )
 }
 
-// ─── Step 2 — Upload Files ──────────────────────────────────────────────────
+// ─── Step 2 — Upload Files ─────────────────────────────────────────────────
 
 function StepUploadFiles({
-  bizObject,
-  docFile,
-  linesFile,
-  onDocFile,
-  onLinesFile,
-  onDocRemove,
-  onLinesRemove,
-  onNext,
-  onBack,
+  bizObject, docFile, linesFile,
+  docErrors, linesErrors,
+  onDocFile, onLinesFile, onDocRemove, onLinesRemove,
+  onNext, onBack,
 }: {
   bizObject: BizObject
   docFile: UploadedFile | null
   linesFile: UploadedFile | null
+  docErrors: CellValidationError[]
+  linesErrors: CellValidationError[]
   onDocFile: (f: File) => Promise<void>
   onLinesFile: (f: File) => Promise<void>
   onDocRemove: () => void
@@ -289,17 +311,13 @@ function StepUploadFiles({
   const [loading, setLoading] = useState<'doc' | 'lines' | null>(null)
 
   const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
-
-  async function handleDocFile(f: File) {
-    setLoading('doc')
-    try { await onDocFile(f) } finally { setLoading(null) }
-  }
-  async function handleLinesFile(f: File) {
-    setLoading('lines')
-    try { await onLinesFile(f) } finally { setLoading(null) }
-  }
-
   const bothUploaded = !!docFile && !!linesFile
+  const activeErrors = activeTab === 'doc' ? docErrors : linesErrors
+  const totalErrors = docErrors.length + linesErrors.length
+  const canProceed = bothUploaded && totalErrors === 0
+
+  async function handleDocFile(f: File) { setLoading('doc'); try { await onDocFile(f) } finally { setLoading(null) } }
+  async function handleLinesFile(f: File) { setLoading('lines'); try { await onLinesFile(f) } finally { setLoading(null) } }
 
   return (
     <div className="space-y-6">
@@ -308,100 +326,102 @@ function StepUploadFiles({
         <p className="text-sm text-gray-500 mt-1">
           Upload the <span className="font-medium text-gray-700">{docLabel}</span> and{' '}
           <span className="font-medium text-gray-700">{linesLabel}</span> files for{' '}
-          <span className="font-medium text-brand-700">{bizObject.label}</span>.
-          Both files are required.
+          <span className="font-medium text-brand-700">{bizObject.label}</span>. Both files are required.
         </p>
       </div>
 
-      {/* Status summary */}
+      {/* File status tabs */}
       <div className="grid grid-cols-2 gap-3">
-        {[
-          { tab: 'doc' as const, label: docLabel, file: docFile },
-          { tab: 'lines' as const, label: linesLabel, file: linesFile },
-        ].map(({ tab, label, file }) => (
+        {([
+          { tab: 'doc' as const, label: docLabel, file: docFile, errors: docErrors },
+          { tab: 'lines' as const, label: linesLabel, file: linesFile, errors: linesErrors },
+        ]).map(({ tab, label, file, errors }) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
               'flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all',
               activeTab === tab
-                ? 'border-brand-400 bg-brand-50'
+                ? errors.length > 0 ? 'border-red-400 bg-red-50' : 'border-brand-400 bg-brand-50'
+                : errors.length > 0 ? 'border-red-200 bg-white hover:border-red-300'
                 : 'border-gray-200 bg-white hover:border-gray-300',
             )}
           >
             <div className={cn(
               'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-              file ? 'bg-green-100' : 'bg-gray-100',
+              !file ? 'bg-gray-100' : errors.length > 0 ? 'bg-red-100' : 'bg-green-100',
             )}>
-              {file
-                ? <CheckCircle2 className="w-4 h-4 text-green-600" />
-                : <UploadCloud className="w-4 h-4 text-gray-400" />
+              {!file
+                ? <UploadCloud className="w-4 h-4 text-gray-400" />
+                : errors.length > 0
+                ? <XCircle className="w-4 h-4 text-red-600" />
+                : <CheckCircle2 className="w-4 h-4 text-green-600" />
               }
             </div>
             <div className="min-w-0">
               <p className={cn(
                 'text-sm font-semibold',
-                activeTab === tab ? 'text-brand-700' : 'text-gray-700',
+                activeTab === tab ? errors.length > 0 ? 'text-red-700' : 'text-brand-700' : 'text-gray-700',
               )}>{label}</p>
               <p className="text-xs text-gray-400 truncate mt-0.5">
-                {file ? `${file.rowCount} rows · ${file.columns.length} cols` : 'Not uploaded'}
+                {!file
+                  ? 'Not uploaded'
+                  : errors.length > 0
+                  ? <span className="text-red-500 font-medium">{errors.length} error{errors.length !== 1 ? 's' : ''}</span>
+                  : `${file.rowCount} rows · ${file.columns.length} cols · valid`
+                }
               </p>
             </div>
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
-      <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5 space-y-3">
+      {/* Dropzone + column list */}
+      <div className={cn(
+        'rounded-2xl border p-5 space-y-3',
+        activeErrors.length > 0 ? 'bg-red-50/40 border-red-200' : 'bg-gray-50 border-gray-200',
+      )}>
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">
-            {activeTab === 'doc' ? docLabel : linesLabel}
-          </h3>
+          <h3 className="text-sm font-semibold text-gray-700">{activeTab === 'doc' ? docLabel : linesLabel}</h3>
           {loading === activeTab && (
             <div className="flex items-center gap-2 text-xs text-brand-600">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Reading file...
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Validating...
             </div>
           )}
         </div>
 
         {activeTab === 'doc'
-          ? <UploadDropzone
-              label={docLabel}
-              uploaded={docFile}
-              onFile={handleDocFile}
-              onRemove={onDocRemove}
-              disabled={loading !== null}
-            />
-          : <UploadDropzone
-              label={linesLabel}
-              uploaded={linesFile}
-              onFile={handleLinesFile}
-              onRemove={onLinesRemove}
-              disabled={loading !== null}
-            />
+          ? <UploadDropzone label={docLabel} uploaded={docFile} onFile={handleDocFile} onRemove={onDocRemove} disabled={loading !== null} />
+          : <UploadDropzone label={linesLabel} uploaded={linesFile} onFile={handleLinesFile} onRemove={onLinesRemove} disabled={loading !== null} />
         }
 
-        {/* Column preview */}
-        {(activeTab === 'doc' ? docFile : linesFile) && (
-          <div className="mt-2">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Detected Columns
-            </p>
+        {/* Detected columns */}
+        {(activeTab === 'doc' ? docFile : linesFile) && activeErrors.length === 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Detected Columns</p>
             <div className="flex flex-wrap gap-1.5">
               {(activeTab === 'doc' ? docFile : linesFile)!.columns.map(col => (
-                <span
-                  key={col}
-                  className="px-2 py-0.5 bg-white border border-gray-200 rounded text-xs font-mono text-gray-600"
-                >
-                  {col}
-                </span>
+                <span key={col} className="px-2 py-0.5 bg-white border border-gray-200 rounded text-xs font-mono text-gray-600">{col}</span>
               ))}
             </div>
           </div>
         )}
+
+        {/* Validation errors for active tab */}
+        {activeErrors.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+              <p className="text-sm font-semibold text-red-700">
+                {activeErrors.length} validation error{activeErrors.length !== 1 ? 's' : ''} found — fix your file and re-upload
+              </p>
+            </div>
+            <ValidationErrorTable errors={activeErrors} />
+          </div>
+        )}
       </div>
 
+      {/* Missing file warning */}
       {!bothUploaded && (
         <div className="flex items-center gap-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
           <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
@@ -412,16 +432,24 @@ function StepUploadFiles({
         </div>
       )}
 
+      {/* Errors block next */}
+      {bothUploaded && totalErrors > 0 && (
+        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+          <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <p className="text-sm text-red-700">
+            <span className="font-semibold">{totalErrors} error{totalErrors !== 1 ? 's' : ''}</span> must be resolved before proceeding.
+            Correct the data in your file{totalErrors !== docErrors.length && totalErrors !== linesErrors.length ? 's' : ''} and re-upload.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all"
-        >
+        <button onClick={onBack} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
         <button
           onClick={onNext}
-          disabled={!bothUploaded}
+          disabled={!canProceed}
           className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
         >
           Next <ChevronRight className="w-4 h-4" />
@@ -431,14 +459,172 @@ function StepUploadFiles({
   )
 }
 
+// ─── Field type badge ──────────────────────────────────────────────────────
+
+function FieldTypeBadge({ def }: { def: SapFieldDef }) {
+  const colorMap: Record<string, string> = {
+    string: 'bg-sky-50 text-sky-700 border-sky-200',
+    date:   'bg-violet-50 text-violet-700 border-violet-200',
+    double: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    long:   'bg-orange-50 text-orange-700 border-orange-200',
+    enum:   'bg-pink-50 text-pink-700 border-pink-200',
+  }
+  return (
+    <span className={cn('px-1.5 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wide', colorMap[def.type] ?? 'bg-gray-100 text-gray-500 border-gray-200')}>
+      {def.type}
+    </span>
+  )
+}
+
+// ─── Target field selector ─────────────────────────────────────────────────
+
+function TargetFieldSelect({
+  value,
+  sapFields,
+  onChange,
+  isUnknownBizObject,
+}: {
+  value: string
+  sapFields: SapFieldDef[]
+  onChange: (v: string) => void
+  isUnknownBizObject: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const matched = sapFields.filter(f =>
+    f.field.toLowerCase().includes(query.toLowerCase()) ||
+    f.description.toLowerCase().includes(query.toLowerCase())
+  )
+
+  const selectedDef = sapFields.find(f => f.field === value)
+
+  if (isUnknownBizObject) {
+    return (
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="SAP field name..."
+        className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400 bg-white placeholder:text-gray-300 font-mono"
+      />
+    )
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen(v => !v); setTimeout(() => inputRef.current?.focus(), 50) }}
+        className={cn(
+          'w-full flex items-center gap-2 px-3 py-1.5 text-xs border rounded-lg transition-all text-left',
+          open
+            ? 'border-brand-400 ring-2 ring-brand-100 bg-white'
+            : value
+            ? 'border-gray-200 bg-white text-gray-800 hover:border-brand-300'
+            : 'border-dashed border-gray-300 bg-gray-50 text-gray-400 hover:border-brand-300 hover:bg-white',
+        )}
+      >
+        {selectedDef ? (
+          <>
+            <span className="font-mono font-semibold text-gray-800 shrink-0">{selectedDef.field}</span>
+            <span className="text-gray-400 truncate">{selectedDef.description}</span>
+            {selectedDef.mandatory && <span className="text-red-500 shrink-0">*</span>}
+          </>
+        ) : (
+          <span className="text-gray-400">Select SAP field...</span>
+        )}
+        <span className="ml-auto shrink-0 text-gray-300">▾</span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+            {/* Search */}
+            <div className="p-2 border-b border-gray-100">
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search fields..."
+                className="w-full px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+            {/* Clear option */}
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false); setQuery('') }}
+              className="w-full text-left px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 italic border-b border-gray-100"
+            >
+              — Clear mapping
+            </button>
+            {/* Field list */}
+            <ul className="max-h-48 overflow-y-auto py-1">
+              {matched.length === 0 && (
+                <li className="px-3 py-3 text-xs text-gray-400 text-center">No fields found</li>
+              )}
+              {matched.map(f => (
+                <li key={f.field}>
+                  <button
+                    type="button"
+                    onClick={() => { onChange(f.field); setOpen(false); setQuery('') }}
+                    className={cn(
+                      'w-full text-left px-3 py-2.5 hover:bg-brand-50 transition-colors flex items-center gap-2',
+                      f.field === value && 'bg-brand-50',
+                    )}
+                  >
+                    <span className="font-mono text-xs font-semibold text-gray-800 w-28 shrink-0">{f.field}</span>
+                    <span className="text-xs text-gray-500 flex-1 truncate">{f.description}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <FieldTypeBadge def={f} />
+                      {f.mandatory && <span className="text-red-500 text-xs font-bold">*</span>}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── Field detail tooltip row ──────────────────────────────────────────────
+
+function FieldDetails({ def }: { def: SapFieldDef }) {
+  const chips: { label: string; className: string }[] = []
+  if (def.fieldLength) chips.push({ label: `len: ${def.fieldLength}`, className: 'bg-gray-100 text-gray-600' })
+  if (def.format)      chips.push({ label: def.format, className: 'bg-violet-50 text-violet-700' })
+  if (def.relatedTable) chips.push({ label: def.relatedTable, className: 'bg-sky-50 text-sky-700' })
+  if (def.isKey)        chips.push({ label: 'KEY', className: 'bg-amber-100 text-amber-700 font-bold' })
+  if (def.isParentKey)  chips.push({ label: 'PARENT KEY', className: 'bg-amber-100 text-amber-700 font-bold' })
+  if (def.mandatory)    chips.push({ label: 'Required', className: 'bg-red-50 text-red-600 font-semibold' })
+  if (def.validValues)  chips.push({ label: def.validValues.join(' | '), className: 'bg-pink-50 text-pink-700 font-mono text-[10px]' })
+
+  return (
+    <div className="flex flex-wrap gap-1 mt-1">
+      {chips.map((c, i) => (
+        <span key={i} className={cn('px-1.5 py-0.5 rounded text-[10px] border border-transparent', c.className)}>
+          {c.label}
+        </span>
+      ))}
+      {def.notes && (
+        <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5 w-full">
+          <Info className="w-3 h-3 shrink-0" />{def.notes}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ─── Step 3 — Field Mapping ────────────────────────────────────────────────
 
 function StepFieldMapping({
-  bizObject,
-  mappings,
-  onMappingChange,
-  onNext,
-  onBack,
+  bizObject, mappings, onMappingChange, onNext, onBack,
 }: {
   bizObject: BizObject
   mappings: MappingRow[]
@@ -449,73 +635,101 @@ function StepFieldMapping({
   const [activeTab, setActiveTab] = useState<'doc' | 'lines'>('doc')
   const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
 
-  const visible = mappings.filter(m => m.tab === activeTab)
+  const config: BizObjectConfig | null = getBizObjectConfig(bizObject.id)
+  const isUnknown = config === null
 
-  function updateTarget(idx: number, value: string) {
-    // idx is index within visible; find in full mappings
-    const fullIdx = mappings.findIndex(
-      (m, i) => m.tab === activeTab && mappings.filter(x => x.tab === activeTab).indexOf(m) === idx
-    )
-    // Safer: filter first, then find
-    const visibleRows = mappings.filter(m => m.tab === activeTab)
-    const sourceField = visibleRows[idx].sourceField
-    const updated = mappings.map(m =>
-      m.tab === activeTab && m.sourceField === sourceField
-        ? { ...m, targetField: value }
-        : m
-    )
+  function handleAutoMap(overwrite: boolean) {
+    if (!config) return
+    const updated = reAutoMap(mappings, config, overwrite)
+    const newlyMapped = updated.filter((r, i) => r.targetField && !mappings[i].targetField).length
     onMappingChange(updated)
+    toast.success(
+      overwrite ? 'All fields re-mapped' : `Auto-mapped ${newlyMapped} field${newlyMapped !== 1 ? 's' : ''}`,
+      { description: overwrite ? 'Existing mappings were replaced.' : 'Already mapped fields were left unchanged.' },
+    )
   }
 
+  const docFields  = config?.fields.doc   ?? []
+  const linesFields = config?.fields.lines ?? []
+
+  const visible = mappings.filter(m => m.tab === activeTab)
+  const sapFields = activeTab === 'doc' ? docFields : linesFields
+
+  function updateTarget(sourceField: string, tab: 'doc' | 'lines', value: string) {
+    onMappingChange(
+      mappings.map(m => m.tab === tab && m.sourceField === sourceField ? { ...m, targetField: value } : m)
+    )
+  }
+
+  // Stats
   const mappedCount = mappings.filter(m => m.targetField.trim() !== '').length
-  const totalCount = mappings.length
+  const totalCount  = mappings.length
+
+  // Unmapped mandatory SAP fields
+  const mappedTargets = new Set(mappings.filter(m => m.tab === activeTab).map(m => m.targetField))
+  const unmappedMandatory = sapFields.filter(f => f.mandatory && !mappedTargets.has(f.field))
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Field Mapping</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Map your source columns (from the uploaded file) to the corresponding SAP B1 target fields.
+            Map your source columns to the SAP B1 target fields for{' '}
+            <span className="font-medium text-brand-700">{bizObject.label}</span>.
           </p>
         </div>
-        <div className="text-right shrink-0">
-          <span className={cn(
-            'text-sm font-semibold',
-            mappedCount === totalCount ? 'text-green-600' : 'text-amber-600',
-          )}>
-            {mappedCount} / {totalCount}
-          </span>
-          <p className="text-xs text-gray-400">fields mapped</p>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Auto Map controls */}
+          {!isUnknown && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleAutoMap(false)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 transition-colors"
+                title="Auto-map unmapped fields only"
+              >
+                <Wand2 className="w-3.5 h-3.5" /> Auto Map
+              </button>
+              <button
+                onClick={() => handleAutoMap(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors"
+                title="Re-map all fields, overwriting existing mappings"
+              >
+                <RotateCcw className="w-3 h-3" /> Reset & Re-map
+              </button>
+            </div>
+          )}
+          <div className="text-right pl-2 border-l border-gray-200">
+            <span className={cn('text-sm font-bold', mappedCount === totalCount ? 'text-green-600' : 'text-amber-600')}>
+              {mappedCount}/{totalCount}
+            </span>
+            <p className="text-[11px] text-gray-400">mapped</p>
+          </div>
         </div>
       </div>
 
-      {/* Info banner about mapping */}
-      <div className="flex items-start gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
-        <AlertCircle className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-        <p className="text-sm text-blue-700">
-          SAP B1 target field definitions will be provided in a future update.
-          You can pre-configure the mapping and update target fields when they become available.
-        </p>
-      </div>
+      {isUnknown && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700">
+            SAP field definitions for <span className="font-semibold">{bizObject.label}</span> are not yet configured.
+            You can still enter target field names manually.
+          </p>
+        </div>
+      )}
 
-      {/* Tab selector */}
-      <div className="flex gap-2 border-b border-gray-200">
-        {[
-          { tab: 'doc' as const, label: docLabel },
-          { tab: 'lines' as const, label: linesLabel },
-        ].map(({ tab, label }) => {
-          const count = mappings.filter(m => m.tab === tab).length
+      {/* Tab bar */}
+      <div className="flex gap-0 border-b border-gray-200">
+        {([['doc', docLabel], ['lines', linesLabel]] as const).map(([tab, label]) => {
+          const count  = mappings.filter(m => m.tab === tab).length
           const mapped = mappings.filter(m => m.tab === tab && m.targetField.trim()).length
           return (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                'px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
-                activeTab === tab
-                  ? 'border-brand-500 text-brand-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700',
+                'px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+                activeTab === tab ? 'border-brand-500 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700',
               )}
             >
               {label}
@@ -530,52 +744,125 @@ function StepFieldMapping({
         })}
       </div>
 
+      {/* Unmapped mandatory warning */}
+      {unmappedMandatory.length > 0 && (
+        <div className="flex items-start gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
+          <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-700">Unmapped required fields</p>
+            <p className="text-xs text-red-600 mt-0.5">
+              The following SAP fields are mandatory and have no source mapping:{' '}
+              {unmappedMandatory.map(f => (
+                <span key={f.field} className="font-mono font-bold">{f.field}{' '}</span>
+              ))}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Mapping table */}
       <div className="overflow-hidden rounded-xl border border-gray-200">
-        <div className="grid grid-cols-[1fr_40px_1fr] bg-gray-50 border-b border-gray-200 px-4 py-2.5">
+        {/* Header */}
+        <div className="grid grid-cols-[1fr_32px_1fr] bg-gray-50 border-b border-gray-200 px-4 py-2.5 gap-3">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Source Field</span>
           <span />
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">SAP B1 Target Field</span>
         </div>
-        <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
-          {visible.map((row, idx) => (
-            <div
-              key={`${row.tab}-${row.sourceField}`}
-              className="grid grid-cols-[1fr_40px_1fr] items-center px-4 py-2.5 hover:bg-gray-50/50 transition-colors"
-            >
-              {/* Source */}
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 bg-brand-50 border border-brand-100 rounded text-xs font-mono text-brand-700 truncate max-w-[200px]">
-                  {row.sourceField}
-                </span>
-              </div>
 
-              {/* Arrow */}
-              <div className="flex items-center justify-center">
-                <ArrowRight className={cn(
-                  'w-4 h-4',
-                  row.targetField ? 'text-brand-500' : 'text-gray-300',
-                )} />
-              </div>
+        {/* Rows */}
+        <div className="divide-y divide-gray-100 max-h-[420px] overflow-y-auto">
+          {visible.map(row => {
+            const selectedDef = sapFields.find(f => f.field === row.targetField)
+            const isMapped = row.targetField.trim() !== ''
 
-              {/* Target */}
-              <input
-                type="text"
-                value={row.targetField}
-                onChange={e => updateTarget(idx, e.target.value)}
-                placeholder="SAP field name..."
-                className="w-full px-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400 bg-white placeholder:text-gray-300 font-mono"
-              />
-            </div>
-          ))}
+            return (
+              <div
+                key={`${row.tab}-${row.sourceField}`}
+                className={cn(
+                  'grid grid-cols-[1fr_32px_1fr] items-start px-4 py-3 gap-3 transition-colors',
+                  isMapped ? 'hover:bg-green-50/30' : 'hover:bg-gray-50/50',
+                )}
+              >
+                {/* Source */}
+                <div>
+                  <span className={cn(
+                    'inline-block px-2.5 py-1 rounded text-xs font-mono truncate max-w-full',
+                    isMapped
+                      ? 'bg-brand-50 border border-brand-200 text-brand-700'
+                      : 'bg-gray-100 border border-gray-200 text-gray-500',
+                  )}>
+                    {row.sourceField}
+                  </span>
+                </div>
+
+                {/* Arrow */}
+                <div className="flex items-center justify-center pt-1.5">
+                  <ArrowRight className={cn('w-4 h-4 shrink-0', isMapped ? 'text-brand-500' : 'text-gray-300')} />
+                </div>
+
+                {/* Target */}
+                <div>
+                  <TargetFieldSelect
+                    value={row.targetField}
+                    sapFields={sapFields}
+                    onChange={v => updateTarget(row.sourceField, row.tab, v)}
+                    isUnknownBizObject={isUnknown}
+                  />
+                  {selectedDef && <FieldDetails def={selectedDef} />}
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
+      {/* SAP fields reference */}
+      {!isUnknown && (
+        <details className="group">
+          <summary className="text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer hover:text-gray-700 list-none flex items-center gap-1.5">
+            <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+            SAP B1 Field Reference — {activeTab === 'doc' ? docLabel : linesLabel}
+            <span className="ml-1 text-gray-300 font-normal normal-case">{sapFields.length} fields</span>
+          </summary>
+          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200">
+            <div className="grid grid-cols-[140px_1fr_80px_80px_80px_100px] bg-gray-50 border-b border-gray-200 px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase tracking-wide gap-2">
+              <span>Field</span>
+              <span>Description</span>
+              <span>Type</span>
+              <span>Length</span>
+              <span>Format</span>
+              <span>Related Table</span>
+            </div>
+            <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+              {sapFields.map(f => (
+                <div
+                  key={f.field}
+                  className={cn(
+                    'grid grid-cols-[140px_1fr_80px_80px_80px_100px] px-3 py-2.5 gap-2 items-center text-xs',
+                    f.mandatory ? 'bg-red-50/40' : 'hover:bg-gray-50/50',
+                  )}
+                >
+                  <span className="font-mono font-semibold text-gray-800 flex items-center gap-1">
+                    {f.field}
+                    {f.mandatory && <span className="text-red-500 font-bold">*</span>}
+                    {(f.isKey || f.isParentKey) && (
+                      <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1 rounded">KEY</span>
+                    )}
+                  </span>
+                  <span className="text-gray-600">{f.description}</span>
+                  <span><FieldTypeBadge def={f} /></span>
+                  <span className="text-gray-400 font-mono">{f.fieldLength ?? '—'}</span>
+                  <span className="text-gray-400 font-mono">{f.format ?? '—'}</span>
+                  <span className="text-gray-400 font-mono">{f.relatedTable ?? '—'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </details>
+      )}
+
       <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all"
-        >
+        <button onClick={onBack} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
         <button
@@ -601,34 +888,28 @@ const ERROR_HANDLING_OPTIONS: {
   {
     value: 'cancel_rollback',
     label: 'Cancel Import & Perform Rollback',
-    description:
-      'If one or more errors occur during import, the entire import will be cancelled and all changes will be rolled back. This ensures data integrity.',
+    description: 'If one or more errors occur during import, the entire import will be cancelled and all changes will be rolled back. This ensures data integrity.',
     icon: <XCircle className="w-5 h-5" />,
     color: 'red',
   },
   {
     value: 'ignore_all',
     label: 'Ignore All Errors',
-    description:
-      'Skip all records that have errors and continue importing the valid records. The import will complete even if some records fail.',
+    description: 'Skip all records that have errors and continue importing the valid records. The import will complete even if some records fail.',
     icon: <AlertTriangle className="w-5 h-5" />,
     color: 'amber',
   },
   {
     value: 'ignore_up_to_10',
     label: 'Ignore Up to 10 Errors',
-    description:
-      'If there are up to 10 errors, skip those records and continue importing the rest. If errors exceed 10, cancel and roll back.',
+    description: 'If there are up to 10 errors, skip those records and continue importing the rest. If errors exceed 10, cancel and roll back.',
     icon: <AlertCircle className="w-5 h-5" />,
     color: 'blue',
   },
 ]
 
 function StepErrorHandling({
-  errorHandling,
-  onChange,
-  onNext,
-  onBack,
+  errorHandling, onChange, onNext, onBack,
 }: {
   errorHandling: ErrorHandlingMode
   onChange: (v: ErrorHandlingMode) => void
@@ -648,43 +929,26 @@ function StepErrorHandling({
         {ERROR_HANDLING_OPTIONS.map(opt => {
           const isSelected = errorHandling === opt.value
           const colorMap: Record<string, string> = {
-            red: isSelected
-              ? 'border-red-400 bg-red-50 ring-2 ring-red-100'
-              : 'border-gray-200 hover:border-red-200 hover:bg-red-50/30',
-            amber: isSelected
-              ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-100'
-              : 'border-gray-200 hover:border-amber-200 hover:bg-amber-50/30',
-            blue: isSelected
-              ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100'
-              : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30',
+            red:   isSelected ? 'border-red-400 bg-red-50 ring-2 ring-red-100' : 'border-gray-200 hover:border-red-200 hover:bg-red-50/30',
+            amber: isSelected ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-100' : 'border-gray-200 hover:border-amber-200 hover:bg-amber-50/30',
+            blue:  isSelected ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100' : 'border-gray-200 hover:border-blue-200 hover:bg-blue-50/30',
           }
-          const iconColorMap: Record<string, string> = {
-            red: 'text-red-500',
-            amber: 'text-amber-500',
-            blue: 'text-blue-500',
-          }
+          const iconColorMap: Record<string, string> = { red: 'text-red-500', amber: 'text-amber-500', blue: 'text-blue-500' }
 
           return (
             <button
               key={opt.value}
               type="button"
               onClick={() => onChange(opt.value)}
-              className={cn(
-                'w-full text-left flex items-start gap-4 px-5 py-4 rounded-xl border-2 transition-all',
-                colorMap[opt.color],
-              )}
+              className={cn('w-full text-left flex items-start gap-4 px-5 py-4 rounded-xl border-2 transition-all', colorMap[opt.color])}
             >
-              <div className={cn('shrink-0 mt-0.5', iconColorMap[opt.color])}>
-                {opt.icon}
-              </div>
+              <div className={cn('shrink-0 mt-0.5', iconColorMap[opt.color])}>{opt.icon}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-gray-900">{opt.label}</p>
                   <div className={cn(
                     'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all',
-                    isSelected
-                      ? 'border-brand-600 bg-brand-600'
-                      : 'border-gray-300 bg-white',
+                    isSelected ? 'border-brand-600 bg-brand-600' : 'border-gray-300 bg-white',
                   )}>
                     {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                   </div>
@@ -697,16 +961,10 @@ function StepErrorHandling({
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all"
-        >
+        <button onClick={onBack} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all">
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
-        <button
-          onClick={onNext}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-sm"
-        >
+        <button onClick={onNext} className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-sm">
           Next <ChevronRight className="w-4 h-4" />
         </button>
       </div>
@@ -723,12 +981,10 @@ function errorHandlingLabel(mode: ErrorHandlingMode) {
 async function mockRunImport(
   mode: 'test' | 'import',
   docFile: UploadedFile,
-  linesFile: UploadedFile,
   errorHandling: ErrorHandlingMode,
 ): Promise<ImportResult> {
   await new Promise(r => setTimeout(r, 1800))
   const total = docFile.rowCount
-  // Simulate ~5% error rate
   const failedCount = Math.floor(total * 0.05)
   const successCount = total - failedCount
 
@@ -757,53 +1013,36 @@ async function mockRunImport(
 }
 
 function ImportResultPanel({
-  result,
-  onReset,
+  result, onReset, onRunImport, onRetestImport,
 }: {
   result: ImportResult
   onReset: () => void
+  onRunImport?: () => void
+  onRetestImport?: () => void
 }) {
   const isTest = result.mode === 'test'
   const ok = result.status === 'success'
   const partial = result.status === 'partial'
 
-  const colorClass = ok
-    ? 'bg-green-50 border-green-200'
-    : partial
-    ? 'bg-amber-50 border-amber-200'
-    : 'bg-red-50 border-red-200'
-
-  const iconEl = ok
-    ? <CheckCircle2 className="w-5 h-5 text-green-600" />
-    : partial
-    ? <AlertTriangle className="w-5 h-5 text-amber-600" />
-    : <XCircle className="w-5 h-5 text-red-600" />
-
-  const titleColor = ok ? 'text-green-800' : partial ? 'text-amber-800' : 'text-red-800'
-
-  const title = isTest
-    ? ok ? 'Test Import Passed' : partial ? 'Test Import — Partial Issues' : 'Test Import Failed'
-    : ok ? 'Import Successful' : partial ? 'Partial Import' : 'Import Failed'
-
   return (
-    <div className={cn('rounded-2xl border p-6 space-y-4', colorClass)}>
+    <div className={cn(
+      'rounded-2xl border p-6 space-y-4',
+      ok ? 'bg-green-50 border-green-200' : partial ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200',
+    )}>
       <div className="flex items-start gap-4">
-        <div className={cn(
-          'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-          ok ? 'bg-green-100' : partial ? 'bg-amber-100' : 'bg-red-100',
-        )}>
-          {iconEl}
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', ok ? 'bg-green-100' : partial ? 'bg-amber-100' : 'bg-red-100')}>
+          {ok ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : partial ? <AlertTriangle className="w-5 h-5 text-amber-600" /> : <XCircle className="w-5 h-5 text-red-600" />}
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            {isTest && (
-              <span className="px-2 py-0.5 text-xs font-bold bg-purple-100 text-purple-700 rounded border border-purple-200 uppercase tracking-wide">
-                Test Only
-              </span>
-            )}
-            <p className={cn('font-bold text-base', titleColor)}>{title}</p>
+            {isTest && <span className="px-2 py-0.5 text-xs font-bold bg-purple-100 text-purple-700 rounded border border-purple-200 uppercase tracking-wide">Test Only</span>}
+            <p className={cn('font-bold text-base', ok ? 'text-green-800' : partial ? 'text-amber-800' : 'text-red-800')}>
+              {isTest
+                ? ok ? 'Test Passed' : partial ? 'Test — Partial Issues' : 'Test Failed'
+                : ok ? 'Import Successful' : partial ? 'Partial Import' : 'Import Failed'
+              }
+            </p>
           </div>
-
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Total Records', value: result.totalRecords },
@@ -811,14 +1050,12 @@ function ImportResultPanel({
               { label: 'Failed', value: result.failedCount },
               {
                 label: result.sapReference ? 'SAP Reference' : 'Timestamp',
-                value: result.sapReference
-                  ? result.sapReference
-                  : new Date(result.timestamp).toLocaleTimeString(),
+                value: result.sapReference ?? new Date(result.timestamp).toLocaleTimeString(),
               },
-            ].map(stat => (
-              <div key={stat.label} className="bg-white/70 rounded-lg p-2.5">
-                <p className="text-xs text-gray-500">{stat.label}</p>
-                <p className="text-sm font-semibold text-gray-800 mt-0.5 truncate">{stat.value}</p>
+            ].map(s => (
+              <div key={s.label} className="bg-white/70 rounded-lg p-2.5">
+                <p className="text-xs text-gray-500">{s.label}</p>
+                <p className="text-sm font-semibold text-gray-800 mt-0.5 truncate">{s.value}</p>
               </div>
             ))}
           </div>
@@ -828,9 +1065,7 @@ function ImportResultPanel({
       {result.errors.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-white/80">
           <div className="bg-white/40 px-4 py-2 border-b border-white/80">
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Errors ({result.errors.length})
-            </p>
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Errors ({result.errors.length})</p>
           </div>
           <div className="divide-y divide-white/60">
             {result.errors.map((err, i) => (
@@ -844,26 +1079,39 @@ function ImportResultPanel({
         </div>
       )}
 
-      <button
-        onClick={onReset}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-      >
-        <RotateCcw className="w-4 h-4" /> Start New Import
-      </button>
+      {/* Actions */}
+      <div className={cn('flex flex-wrap items-center gap-2 pt-1', isTest && 'border-t border-white/60')}>
+        {/* After test: offer to proceed with actual import */}
+        {isTest && onRunImport && (
+          <button
+            onClick={onRunImport}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors shadow-sm"
+          >
+            <Send className="w-4 h-4" /> Proceed with Import
+          </button>
+        )}
+        {isTest && onRetestImport && (
+          <button
+            onClick={onRetestImport}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white border border-purple-200 text-purple-700 rounded-xl hover:bg-purple-50 transition-colors"
+          >
+            <FlaskConical className="w-4 h-4" /> Run Test Again
+          </button>
+        )}
+        <button
+          onClick={onReset}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-white border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors"
+        >
+          <RotateCcw className="w-4 h-4" /> Start New Import
+        </button>
+      </div>
     </div>
   )
 }
 
 function StepImport({
-  bizObject,
-  docFile,
-  linesFile,
-  mappings,
-  errorHandling,
-  result,
-  onResult,
-  onBack,
-  onReset,
+  bizObject, docFile, linesFile, mappings, errorHandling,
+  result, onResult, onClearResult, onBack, onReset,
 }: {
   bizObject: BizObject
   docFile: UploadedFile
@@ -872,18 +1120,18 @@ function StepImport({
   errorHandling: ErrorHandlingMode
   result: ImportResult | null
   onResult: (r: ImportResult) => void
+  onClearResult: () => void
   onBack: () => void
   onReset: () => void
 }) {
   const [running, setRunning] = useState<'test' | 'import' | null>(null)
   const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
-
   const mappedCount = mappings.filter(m => m.targetField.trim()).length
 
   async function run(mode: 'test' | 'import') {
     setRunning(mode)
     try {
-      const r = await mockRunImport(mode, docFile, linesFile, errorHandling)
+      const r = await mockRunImport(mode, docFile, errorHandling)
       onResult(r)
       if (mode === 'import') {
         if (r.status === 'success') toast.success('Import completed successfully!', { description: `SAP Ref: ${r.sapReference}` })
@@ -902,117 +1150,87 @@ function StepImport({
     <div className="space-y-6">
       <div>
         <h2 className="text-lg font-bold text-gray-900">Import</h2>
-        <p className="text-sm text-gray-500 mt-1">
-          Review the import configuration and run a test or start the actual import.
-        </p>
+        <p className="text-sm text-gray-500 mt-1">Review your configuration then run a test or start the actual import.</p>
       </div>
 
-      {/* Configuration summary */}
+      {/* Config summary */}
       <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5 space-y-4">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Import Configuration</h3>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-          <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-            <p className="text-xs text-gray-400 mb-1">Business Object</p>
-            <p className="font-semibold text-gray-800">{bizObject.label}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-            <p className="text-xs text-gray-400 mb-1">Error Handling</p>
-            <p className="font-semibold text-gray-800">{errorHandlingLabel(errorHandling)}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-            <p className="text-xs text-gray-400 mb-1">{docLabel}</p>
-            <p className="font-medium text-gray-700 truncate">{docFile.file.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{docFile.rowCount} rows</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-100 px-4 py-3">
-            <p className="text-xs text-gray-400 mb-1">{linesLabel}</p>
-            <p className="font-medium text-gray-700 truncate">{linesFile.file.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{linesFile.rowCount} rows</p>
-          </div>
+          {[
+            { label: 'Business Object', value: bizObject.label },
+            { label: 'Error Handling', value: errorHandlingLabel(errorHandling) },
+            { label: docLabel, value: `${docFile.file.name} (${docFile.rowCount} rows)` },
+            { label: linesLabel, value: `${linesFile.file.name} (${linesFile.rowCount} rows)` },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-xl border border-gray-100 px-4 py-3">
+              <p className="text-xs text-gray-400 mb-1">{s.label}</p>
+              <p className="font-medium text-gray-800 truncate">{s.value}</p>
+            </div>
+          ))}
         </div>
-
         <div className="flex items-center gap-2 pt-1">
           <span className={cn(
             'text-xs font-medium px-2.5 py-1 rounded-full',
-            mappedCount === mappings.length
-              ? 'bg-green-100 text-green-700'
-              : 'bg-amber-100 text-amber-700',
+            mappedCount === mappings.length ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700',
           )}>
             {mappedCount}/{mappings.length} fields mapped
           </span>
           {mappedCount < mappings.length && (
-            <span className="text-xs text-amber-600">
-              — Unmapped fields will be skipped during import.
-            </span>
+            <span className="text-xs text-amber-600">— Unmapped fields will be skipped.</span>
           )}
         </div>
       </div>
 
-      {/* Action buttons */}
       {!result && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Test Import */}
           <button
             onClick={() => run('test')}
             disabled={running !== null}
             className={cn(
-              'flex flex-col items-center gap-3 px-6 py-6 rounded-2xl border-2 transition-all font-medium',
-              running === 'test'
-                ? 'border-purple-400 bg-purple-50'
+              'flex flex-col items-center gap-3 px-6 py-6 rounded-2xl border-2 transition-all',
+              running === 'test' ? 'border-purple-400 bg-purple-50'
                 : 'border-purple-200 bg-white hover:border-purple-400 hover:bg-purple-50',
               running !== null && running !== 'test' && 'opacity-50 cursor-not-allowed',
             )}
           >
             <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center">
-              {running === 'test'
-                ? <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-                : <FlaskConical className="w-6 h-6 text-purple-600" />
-              }
+              {running === 'test' ? <Loader2 className="w-6 h-6 text-purple-600 animate-spin" /> : <FlaskConical className="w-6 h-6 text-purple-600" />}
             </div>
             <div className="text-center">
-              <p className="font-semibold text-gray-800">
-                {running === 'test' ? 'Running test...' : 'Test Import'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Validate data without making changes to SAP
-              </p>
+              <p className="font-semibold text-gray-800">{running === 'test' ? 'Running test...' : 'Test Import'}</p>
+              <p className="text-xs text-gray-500 mt-1">Validate data without making changes to SAP</p>
             </div>
           </button>
 
-          {/* Import Now */}
           <button
             onClick={() => run('import')}
             disabled={running !== null}
             className={cn(
-              'flex flex-col items-center gap-3 px-6 py-6 rounded-2xl border-2 transition-all font-medium',
-              running === 'import'
-                ? 'border-brand-500 bg-brand-50'
+              'flex flex-col items-center gap-3 px-6 py-6 rounded-2xl border-2 transition-all',
+              running === 'import' ? 'border-brand-500 bg-brand-50'
                 : 'border-brand-300 bg-white hover:border-brand-500 hover:bg-brand-50',
               running !== null && running !== 'import' && 'opacity-50 cursor-not-allowed',
             )}
           >
             <div className="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center">
-              {running === 'import'
-                ? <Loader2 className="w-6 h-6 text-brand-600 animate-spin" />
-                : <Send className="w-6 h-6 text-brand-600" />
-              }
+              {running === 'import' ? <Loader2 className="w-6 h-6 text-brand-600 animate-spin" /> : <Send className="w-6 h-6 text-brand-600" />}
             </div>
             <div className="text-center">
-              <p className="font-semibold text-gray-800">
-                {running === 'import' ? 'Importing...' : 'Import Now'}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Import data directly into SAP B1
-              </p>
+              <p className="font-semibold text-gray-800">{running === 'import' ? 'Importing...' : 'Import Now'}</p>
+              <p className="text-xs text-gray-500 mt-1">Import data directly into SAP B1</p>
             </div>
           </button>
         </div>
       )}
 
-      {/* Result */}
       {result && (
-        <ImportResultPanel result={result} onReset={onReset} />
+        <ImportResultPanel
+          result={result}
+          onReset={onReset}
+          onRunImport={result.mode === 'test' ? () => { onClearResult(); run('import') } : undefined}
+          onRetestImport={result.mode === 'test' ? () => { onClearResult(); run('test') } : undefined}
+        />
       )}
 
       {!result && (
@@ -1038,34 +1256,61 @@ export default function Import() {
   const [docFile, setDocFile] = useState<UploadedFile | null>(null)
   const [linesFile, setLinesFile] = useState<UploadedFile | null>(null)
   const [mappings, setMappings] = useState<MappingRow[]>([])
+  const [docErrors, setDocErrors] = useState<CellValidationError[]>([])
+  const [linesErrors, setLinesErrors] = useState<CellValidationError[]>([])
   const [errorHandling, setErrorHandling] = useState<ErrorHandlingMode>('cancel_rollback')
   const [result, setResult] = useState<ImportResult | null>(null)
 
+  function buildMappings(docCols: string[], linesCols: string[], bizObj: BizObject | null) {
+    const config = bizObj ? getBizObjectConfig(bizObj.id) : null
+    return config
+      ? applyAutoMap(docCols, linesCols, config)
+      : buildFallbackMappings(docCols, linesCols)
+  }
+
+  function runValidation(
+    uploadedDoc: UploadedFile | null,
+    uploadedLines: UploadedFile | null,
+    currentMappings: MappingRow[],
+    bizObj: BizObject | null,
+  ) {
+    const config = bizObj ? getBizObjectConfig(bizObj.id) : null
+    if (!config) { setDocErrors([]); setLinesErrors([]); return }
+
+    if (uploadedDoc) {
+      setDocErrors(validateMappedRows(uploadedDoc.rows, currentMappings, config.fields.doc, 'doc'))
+    }
+    if (uploadedLines) {
+      setLinesErrors(validateMappedRows(uploadedLines.rows, currentMappings, config.fields.lines, 'lines'))
+    }
+  }
+
   function handleSelectBizObject(o: BizObject) {
     setBizObject(o)
-    // Reset downstream state when object changes
     setDocFile(null)
     setLinesFile(null)
     setMappings([])
+    setDocErrors([])
+    setLinesErrors([])
     setResult(null)
   }
 
   async function handleDocFile(f: File) {
-    const { columns, rowCount } = await readFileColumns(f)
-    const uploaded: UploadedFile = { file: f, columns, rowCount }
+    const { columns, rowCount, rows } = await readFile(f)
+    const uploaded: UploadedFile = { file: f, columns, rowCount, rows }
+    const newMappings = buildMappings(columns, linesFile?.columns ?? [], bizObject)
     setDocFile(uploaded)
-    // Rebuild mappings
-    const linesCols = linesFile?.columns ?? []
-    setMappings(buildInitialMappings(columns, linesCols))
+    setMappings(newMappings)
+    runValidation(uploaded, linesFile, newMappings, bizObject)
   }
 
   async function handleLinesFile(f: File) {
-    const { columns, rowCount } = await readFileColumns(f)
-    const uploaded: UploadedFile = { file: f, columns, rowCount }
+    const { columns, rowCount, rows } = await readFile(f)
+    const uploaded: UploadedFile = { file: f, columns, rowCount, rows }
+    const newMappings = buildMappings(docFile?.columns ?? [], columns, bizObject)
     setLinesFile(uploaded)
-    // Rebuild mappings
-    const docCols = docFile?.columns ?? []
-    setMappings(buildInitialMappings(docCols, columns))
+    setMappings(newMappings)
+    runValidation(docFile, uploaded, newMappings, bizObject)
   }
 
   function handleReset() {
@@ -1074,13 +1319,14 @@ export default function Import() {
     setDocFile(null)
     setLinesFile(null)
     setMappings([])
+    setDocErrors([])
+    setLinesErrors([])
     setErrorHandling('cancel_rollback')
     setResult(null)
   }
 
   return (
     <div className="p-8 max-w-4xl mx-auto space-y-8">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Data Import</h1>
@@ -1089,38 +1335,37 @@ export default function Import() {
           </p>
         </div>
         {(step > 1 || bizObject) && !result && (
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={handleReset} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
             <RotateCcw className="w-3.5 h-3.5" /> Start Over
           </button>
         )}
       </div>
 
-      {/* Progress */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5 overflow-x-auto">
         <WizardProgress step={step} />
       </div>
 
-      {/* Step content */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
         {step === 1 && (
-          <StepBusinessObject
-            selected={bizObject}
-            onSelect={handleSelectBizObject}
-            onNext={() => setStep(2)}
-          />
+          <StepBusinessObject selected={bizObject} onSelect={handleSelectBizObject} onNext={() => setStep(2)} />
         )}
         {step === 2 && bizObject && (
           <StepUploadFiles
             bizObject={bizObject}
             docFile={docFile}
             linesFile={linesFile}
+            docErrors={docErrors}
+            linesErrors={linesErrors}
             onDocFile={handleDocFile}
             onLinesFile={handleLinesFile}
-            onDocRemove={() => { setDocFile(null); setMappings(buildInitialMappings([], linesFile?.columns ?? [])) }}
-            onLinesRemove={() => { setLinesFile(null); setMappings(buildInitialMappings(docFile?.columns ?? [], [])) }}
+            onDocRemove={() => {
+              const newMappings = buildMappings([], linesFile?.columns ?? [], bizObject)
+              setDocFile(null); setDocErrors([]); setMappings(newMappings)
+            }}
+            onLinesRemove={() => {
+              const newMappings = buildMappings(docFile?.columns ?? [], [], bizObject)
+              setLinesFile(null); setLinesErrors([]); setMappings(newMappings)
+            }}
             onNext={() => setStep(3)}
             onBack={() => setStep(1)}
           />
@@ -1135,12 +1380,7 @@ export default function Import() {
           />
         )}
         {step === 4 && (
-          <StepErrorHandling
-            errorHandling={errorHandling}
-            onChange={setErrorHandling}
-            onNext={() => setStep(5)}
-            onBack={() => setStep(3)}
-          />
+          <StepErrorHandling errorHandling={errorHandling} onChange={setErrorHandling} onNext={() => setStep(5)} onBack={() => setStep(3)} />
         )}
         {step === 5 && bizObject && docFile && linesFile && (
           <StepImport
@@ -1151,6 +1391,7 @@ export default function Import() {
             errorHandling={errorHandling}
             result={result}
             onResult={setResult}
+            onClearResult={() => setResult(null)}
             onBack={() => setStep(4)}
             onReset={handleReset}
           />

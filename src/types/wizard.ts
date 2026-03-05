@@ -68,8 +68,17 @@ export type WizardStep = 1 | 2 | 3 | 4 | 5
 
 export interface UploadedFile {
   file: File
-  columns: string[]   // header row
+  columns: string[]
   rowCount: number
+  rows: Record<string, unknown>[]
+}
+
+export interface CellValidationError {
+  row: number           // 1-indexed (row 1 = first data row)
+  sourceColumn: string  // column header in the uploaded file
+  targetField: string   // SAP field name it maps to
+  value: string         // raw cell value as string
+  reason: string
 }
 
 export interface WizardState {
