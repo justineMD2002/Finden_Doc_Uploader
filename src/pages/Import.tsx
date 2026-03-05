@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   TrendingUp, ShoppingCart, Package, ChevronRight, ChevronLeft,
   UploadCloud, FileSpreadsheet, X, CheckCircle2, XCircle, Loader2,
@@ -19,6 +19,12 @@ import {
   type SapFieldDef, type BizObjectConfig,
 } from '@/lib/sapFields'
 import type { CellValidationError } from '@/types/wizard'
+import {
+  saveWizardDraft, loadWizardDraft, clearWizardDraft,
+  storedFileToUploaded, uploadedFileToStored,
+} from '@/lib/wizardStorage'
+import { insertImportLog } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1362,6 +1368,8 @@ function StepImport({
 // ─── Main page ─────────────────────────────────────────────────────────────
 
 export default function Import() {
+  const { user } = useAuth()
+
   const [step, setStep] = useState<WizardStep>(1)
   const [bizObject, setBizObject] = useState<BizObject | null>(null)
   const [docFile, setDocFile] = useState<UploadedFile | null>(null)
@@ -1371,6 +1379,40 @@ export default function Import() {
   const [linesErrors, setLinesErrors] = useState<CellValidationError[]>([])
   const [errorHandling, setErrorHandling] = useState<ErrorHandlingMode>('cancel_rollback')
   const [result, setResult] = useState<ImportResult | null>(null)
+
+  // ── Restore draft on mount ───────────────────────────────────────────────
+  useEffect(() => {
+    const draft = loadWizardDraft()
+    if (!draft) return
+
+    setStep(draft.step)
+    setBizObject(draft.bizObject)
+    setMappings(draft.mappings)
+    setErrorHandling(draft.errorHandling)
+
+    if (draft.docFileData) {
+      setDocFile(storedFileToUploaded(draft.docFileData))
+    }
+    if (draft.linesFileData) {
+      setLinesFile(storedFileToUploaded(draft.linesFileData))
+    }
+    // Don't restore errors — user will re-validate if needed
+  }, [])
+
+  // ── Save draft whenever relevant state changes ───────────────────────────
+  useEffect(() => {
+    // Don't save if we're in the fresh empty state
+    if (step === 1 && bizObject === null) return
+
+    saveWizardDraft({
+      step,
+      bizObject,
+      docFileData: docFile ? uploadedFileToStored(docFile) : null,
+      linesFileData: linesFile ? uploadedFileToStored(linesFile) : null,
+      mappings,
+      errorHandling,
+    })
+  }, [step, bizObject, docFile, linesFile, mappings, errorHandling])
 
   function buildMappings(docCols: string[], linesCols: string[], bizObj: BizObject | null) {
     const config = bizObj ? getBizObjectConfig(bizObj.id) : null
@@ -1425,6 +1467,7 @@ export default function Import() {
   }
 
   function handleReset() {
+    clearWizardDraft()
     setStep(1)
     setBizObject(null)
     setDocFile(null)
@@ -1434,6 +1477,42 @@ export default function Import() {
     setLinesErrors([])
     setErrorHandling('cancel_rollback')
     setResult(null)
+  }
+
+  // ── Handle import completion — set result + insert log if real import ────
+  async function handleImportComplete(r: ImportResult) {
+    setResult(r)
+
+    if (r.mode === 'import' && bizObject) {
+      try {
+        await insertImportLog({
+          user_id: user?.id ?? 'anonymous',
+          user_name: user?.name ?? 'Unknown',
+          user_email: user?.email ?? '',
+          biz_object_id: bizObject.id,
+          biz_object_label: bizObject.label,
+          doc_filename: docFile?.file.name ?? null,
+          lines_filename: linesFile?.file.name ?? null,
+          mode: r.mode,
+          status: r.status,
+          total_records: r.totalRecords,
+          success_count: r.successCount,
+          failed_count: r.failedCount,
+          sap_reference: r.sapReference ?? null,
+          errors: r.errors,
+          mappings: mappings,
+          error_handling: errorHandling,
+        })
+      } catch (err) {
+        console.error('Failed to insert import log:', err)
+        toast.error('Import log could not be saved', { description: 'The import completed but the log entry failed to save.' })
+      }
+
+      // Clear draft after a successful real import
+      if (r.status === 'success') {
+        clearWizardDraft()
+      }
+    }
   }
 
   return (
@@ -1501,7 +1580,7 @@ export default function Import() {
             mappings={mappings}
             errorHandling={errorHandling}
             result={result}
-            onResult={setResult}
+            onResult={handleImportComplete}
             onClearResult={() => setResult(null)}
             onBack={() => setStep(4)}
             onReset={handleReset}

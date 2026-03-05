@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { login as authLogin, logout as authLogout, getStoredUser, updateStoredUser, type User } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
+import { supabaseUserToUser, type User } from '@/lib/auth'
 
 interface AuthContextValue {
   user: User | null
@@ -15,31 +16,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // ── Bootstrap: read existing session then subscribe to auth changes ──────
   useEffect(() => {
-    const stored = getStoredUser()
-    setUser(stored)
-    setIsLoading(false)
+    // Check for an existing session (e.g. after a page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ? supabaseUserToUser(session.user) : null)
+      setIsLoading(false)
+    })
+
+    // Keep state in sync whenever the Supabase session changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ? supabaseUserToUser(session.user) : null)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
+  // ── Login ────────────────────────────────────────────────────────────────
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate async auth
-    await new Promise(res => setTimeout(res, 800))
-    const result = authLogin(email, password)
-    if (result) {
-      setUser(result)
-      return true
-    }
-    return false
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) return false
+    return true
   }
 
+  // ── Logout ───────────────────────────────────────────────────────────────
   const logout = () => {
-    authLogout()
+    supabase.auth.signOut()
     setUser(null)
   }
 
-  const updateUser = (updates: Partial<Pick<User, 'name' | 'email'>>) => {
-    const updated = updateStoredUser(updates)
-    if (updated) setUser(updated)
+  // ── Update display name / email ───────────────────────────────────────────
+  const updateUser = async (updates: Partial<Pick<User, 'name' | 'email'>>) => {
+    const metaUpdate: Record<string, unknown> = {}
+    if (updates.name) metaUpdate.full_name = updates.name
+
+    const { data, error } = await supabase.auth.updateUser({
+      ...(updates.email ? { email: updates.email } : {}),
+      data: metaUpdate,
+    })
+
+    if (!error && data.user) {
+      setUser(supabaseUserToUser(data.user))
+    }
   }
 
   return (

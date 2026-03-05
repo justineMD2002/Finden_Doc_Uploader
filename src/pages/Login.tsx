@@ -28,7 +28,7 @@ export default function Login() {
     setLoading(false)
 
     if (success) {
-      navigate('/upload')
+      navigate('/upload-doc')
     } else {
       setError('Invalid email or password. Please try again.')
     }
@@ -87,15 +87,6 @@ export default function Login() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
             <p className="text-gray-500 text-sm mt-1">Sign in to your account to continue</p>
-          </div>
-
-          {/* Demo credentials hint */}
-          <div className="mb-6 p-4 rounded-xl bg-blue-50 border border-blue-100">
-            <p className="text-xs font-semibold text-blue-700 mb-2">Demo Credentials</p>
-            <div className="space-y-1 text-xs text-blue-600 font-mono">
-              <p>admin@pixelcare.com / admin123</p>
-              <p>user@pixelcare.com / user123</p>
-            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,46 +1,66 @@
+// ─── User type ───────────────────────────────────────────────────────────────
+// This is the application-level user shape used throughout the UI.
+// It is derived from the Supabase Auth user inside AuthContext.
+
 export interface User {
   id: string
   name: string
   email: string
   role: 'admin' | 'user'
-  avatar: string
+  avatar: string  // two-letter initials
 }
 
-const MOCK_USERS = [
-  { id: '1', email: 'admin@pixelcare.com', password: 'admin123', name: 'Admin User', role: 'admin' as const, avatar: 'AU' },
-  { id: '2', email: 'user@pixelcare.com', password: 'user123', name: 'John Dela Cruz', role: 'user' as const, avatar: 'JD' },
-]
+// ─── Supabase → User mapper ──────────────────────────────────────────────────
 
-const AUTH_KEY = 'pixelcare_auth_user'
+import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
 
-export function login(email: string, password: string): User | null {
-  const found = MOCK_USERS.find(u => u.email === email && u.password === password)
-  if (!found) return null
-  const user: User = { id: found.id, name: found.name, email: found.email, role: found.role, avatar: found.avatar }
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user))
-  return user
-}
+export function supabaseUserToUser(supabaseUser: SupabaseAuthUser): User {
+  const name: string =
+    supabaseUser.user_metadata?.full_name ??
+    supabaseUser.email ??
+    'Unknown'
 
-export function logout() {
-  localStorage.removeItem(AUTH_KEY)
-}
+  const role: 'admin' | 'user' =
+    supabaseUser.user_metadata?.role === 'admin' ? 'admin' : 'user'
 
-export function updateStoredUser(updates: Partial<Pick<User, 'name' | 'email'>>): User | null {
-  const current = getStoredUser()
-  if (!current) return null
-  const newName = updates.name ?? current.name
-  const avatar = newName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
-  const updated: User = { ...current, ...updates, avatar }
-  localStorage.setItem(AUTH_KEY, JSON.stringify(updated))
-  return updated
-}
+  const avatar = name
+    .split(' ')
+    .map((w: string) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
-export function getStoredUser(): User | null {
-  const raw = localStorage.getItem(AUTH_KEY)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as User
-  } catch {
-    return null
+  return {
+    id: supabaseUser.id,
+    name,
+    email: supabaseUser.email ?? '',
+    role,
+    avatar,
   }
+}
+
+// ─── Deprecated stubs (kept so existing imports don't break) ─────────────────
+// These functions were part of the old mock-auth system.
+// They are no-ops now; authentication is handled by Supabase in AuthContext.
+
+/** @deprecated Use Supabase auth via AuthContext instead */
+export function login(_email: string, _password: string): User | null {
+  return null
+}
+
+/** @deprecated Use Supabase auth via AuthContext instead */
+export function logout(): void {
+  // no-op
+}
+
+/** @deprecated Session is now managed by Supabase */
+export function getStoredUser(): User | null {
+  return null
+}
+
+/** @deprecated User updates go through supabase.auth.updateUser() */
+export function updateStoredUser(
+  _updates: Partial<Pick<User, 'name' | 'email'>>,
+): User | null {
+  return null
 }

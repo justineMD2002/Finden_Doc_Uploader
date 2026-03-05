@@ -1,11 +1,12 @@
 import { useState, useEffect, Fragment } from 'react'
 import {
   CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronRight,
-  RefreshCw, Search, FileDown, ClipboardList
+  RefreshCw, Search, FileDown, ClipboardList, Loader2,
 } from 'lucide-react'
-import { getLogs } from '@/lib/mockSap'
-import type { UploadLog } from '@/types/document'
+import { fetchImportLogs, type ImportLogRow } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
 import { cn, formatDateTime, formatDate } from '@/lib/utils'
+import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 
 const STATUS_CONFIG = {
@@ -14,62 +15,97 @@ const STATUS_CONFIG = {
   FAILED:  { label: 'Failed',  icon: XCircle,      cls: 'bg-red-100 text-red-700',     dot: 'bg-red-400' },
 }
 
+type StatusKey = keyof typeof STATUS_CONFIG
+
+function statusKey(log: ImportLogRow): StatusKey {
+  return log.status.toUpperCase() as StatusKey
+}
+
 export default function Logs() {
-  const [logs, setLogs] = useState<UploadLog[]>([])
+  const { user } = useAuth()
+  const [logs, setLogs] = useState<ImportLogRow[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'PARTIAL' | 'FAILED'>('ALL')
+  const [statusFilter, setStatusFilter] = useState<'ALL' | StatusKey>('ALL')
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [justRefreshed, setJustRefreshed] = useState(false)
 
-  function refresh() {
+  async function loadLogs() {
+    try {
+      const data = await fetchImportLogs(user?.email)
+      setLogs(data)
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to load import logs', { description: 'Please check your connection and try again.' })
+    }
+  }
+
+  async function refresh() {
     setIsRefreshing(true)
     setJustRefreshed(false)
-    setTimeout(() => {
-      setLogs(getLogs())
-      setIsRefreshing(false)
+    try {
+      await loadLogs()
       setJustRefreshed(true)
       setTimeout(() => setJustRefreshed(false), 2000)
-    }, 600)
+    } finally {
+      setIsRefreshing(false)
+    }
   }
 
   useEffect(() => {
-    setLogs(getLogs())
+    loadLogs().finally(() => setIsLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function exportLogs() {
     const data = filtered.map(log => ({
-      ID: log.id,
-      Filename: log.filename,
-      'Uploaded By': log.uploadedBy,
-      'Uploaded At': formatDateTime(log.uploadedAt),
-      Database: log.databaseName ?? '',
-      'Total Rows': log.rowCount,
-      'Success': log.successCount,
-      'Failed': log.failedCount,
-      Status: log.status,
-      'SAP Reference': log.sapReference ?? '',
+      ID: log.id ?? '',
+      'Business Object': log.biz_object_label,
+      'Doc Filename': log.doc_filename ?? '',
+      'Lines Filename': log.lines_filename ?? '',
+      'Uploaded By': log.user_name,
+      'User Email': log.user_email,
+      'Date': formatDateTime(log.created_at ?? ''),
+      Mode: log.mode,
+      'Total Rows': log.total_records,
+      'Success': log.success_count,
+      'Failed': log.failed_count,
+      Status: statusKey(log),
+      'SAP Reference': log.sap_reference ?? '',
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'Upload Logs')
-    XLSX.writeFile(wb, `upload_logs_${Date.now()}.xlsx`)
+    XLSX.utils.book_append_sheet(wb, ws, 'Import Logs')
+    XLSX.writeFile(wb, `import_logs_${Date.now()}.xlsx`)
   }
 
   const filtered = logs.filter(log => {
+    const filename = log.doc_filename ?? log.lines_filename ?? ''
     const matchSearch =
-      log.filename.toLowerCase().includes(search.toLowerCase()) ||
-      log.uploadedBy.toLowerCase().includes(search.toLowerCase()) ||
-      (log.sapReference ?? '').toLowerCase().includes(search.toLowerCase())
-    const matchStatus = statusFilter === 'ALL' || log.status === statusFilter
+      filename.toLowerCase().includes(search.toLowerCase()) ||
+      log.user_name.toLowerCase().includes(search.toLowerCase()) ||
+      (log.sap_reference ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      log.biz_object_label.toLowerCase().includes(search.toLowerCase())
+    const matchStatus = statusFilter === 'ALL' || statusKey(log) === statusFilter
     return matchSearch && matchStatus
   })
 
   const stats = {
     total: logs.length,
-    success: logs.filter(l => l.status === 'SUCCESS').length,
-    // partial: logs.filter(l => l.status === 'PARTIAL').length,
-    failed: logs.filter(l => l.status === 'FAILED').length,
+    success: logs.filter(l => l.status === 'success').length,
+    failed: logs.filter(l => l.status === 'failed').length,
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-64">
+        <div className="flex items-center gap-3 text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm">Loading import logs...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -77,8 +113,8 @@ export default function Logs() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Upload Logs</h1>
-          <p className="text-sm text-gray-500 mt-1">Track all document upload history and SAP submission results</p>
+          <h1 className="text-2xl font-bold text-gray-900">Import Logs</h1>
+          <p className="text-sm text-gray-500 mt-1">Track all SAP B1 import history and submission results</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -89,16 +125,6 @@ export default function Logs() {
             <FileDown className="w-4 h-4" />
             Export
           </button>
-          {/* Clear button hidden for now — uncomment to re-enable
-          <button
-            onClick={clearLogs}
-            disabled={logs.length === 0}
-            className="flex items-center gap-2 px-3 py-2 text-sm border border-red-200 rounded-xl text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-            Clear
-          </button>
-          */}
           <button
             onClick={refresh}
             disabled={isRefreshing}
@@ -119,9 +145,8 @@ export default function Logs() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Uploads', value: stats.total, cls: 'text-gray-800', bg: 'bg-white' },
+          { label: 'Total Imports', value: stats.total, cls: 'text-gray-800', bg: 'bg-white' },
           { label: 'Successful', value: stats.success, cls: 'text-green-700', bg: 'bg-green-50' },
-          // { label: 'Partial', value: stats.partial, cls: 'text-amber-700', bg: 'bg-amber-50' },
           { label: 'Failed', value: stats.failed, cls: 'text-red-700', bg: 'bg-red-50' },
         ].map(s => (
           <div key={s.label} className={cn('rounded-xl border border-gray-100 shadow-sm p-4', s.bg)}>
@@ -138,7 +163,7 @@ export default function Logs() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by filename, user, SAP ref..."
+            placeholder="Search by filename, user, business object, SAP ref..."
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-400"
           />
         </div>
@@ -167,14 +192,15 @@ export default function Logs() {
             <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
               <ClipboardList className="w-6 h-6 text-gray-400" />
             </div>
-            <p className="text-sm font-medium text-gray-500">No upload logs found</p>
-            <p className="text-xs text-gray-400 mt-1">{logs.length === 0 ? 'Upload a document to see logs here.' : 'Try adjusting your search or filters.'}</p>
+            <p className="text-sm font-medium text-gray-500">No import logs found</p>
+            <p className="text-xs text-gray-400 mt-1">{logs.length === 0 ? 'Run an import to see logs here.' : 'Try adjusting your search or filters.'}</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500">
                 <th className="w-8 px-5 py-3" />
+                <th className="text-left px-3 py-3">Business Object</th>
                 <th className="text-left px-3 py-3">Filename</th>
                 <th className="text-left px-3 py-3">Uploaded By</th>
                 <th className="text-left px-3 py-3 whitespace-nowrap">Date</th>
@@ -186,14 +212,16 @@ export default function Logs() {
             </thead>
             <tbody className="divide-y divide-gray-50">
             {filtered.map(log => {
-              const cfg = STATUS_CONFIG[log.status]
+              const sk = statusKey(log)
+              const cfg = STATUS_CONFIG[sk] ?? STATUS_CONFIG.FAILED
               const StatusIcon = cfg.icon
               const isExpanded = expandedId === log.id
+              const filename = log.doc_filename ?? log.lines_filename ?? '—'
 
               return (
                 <Fragment key={log.id}>
                   <tr
-                    onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                    onClick={() => setExpandedId(isExpanded ? null : (log.id ?? null))}
                     className="hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <td className="px-5 py-3.5 text-gray-400 w-8">
@@ -202,14 +230,17 @@ export default function Logs() {
                         : <ChevronRight className="w-4 h-4" />
                       }
                     </td>
-                    <td className="px-3 py-3.5 text-sm font-medium text-gray-900 max-w-[220px]">
-                      <span className="block truncate">{log.filename}</span>
+                    <td className="px-3 py-3.5 text-sm font-medium text-gray-700 max-w-[160px]">
+                      <span className="block truncate">{log.biz_object_label}</span>
                     </td>
-                    <td className="px-3 py-3.5 text-sm text-gray-600 whitespace-nowrap">{log.uploadedBy}</td>
-                    <td className="px-3 py-3.5 text-xs text-gray-400 whitespace-nowrap">{formatDate(log.uploadedAt)}</td>
-                    <td className="px-3 py-3.5 text-sm text-gray-700 text-center">{log.rowCount}</td>
-                    <td className="px-3 py-3.5 text-sm text-green-600 font-medium text-center">{log.successCount}</td>
-                    <td className={cn('px-3 py-3.5 text-sm font-medium text-center', log.failedCount > 0 ? 'text-red-500' : 'text-gray-400')}>{log.failedCount}</td>
+                    <td className="px-3 py-3.5 text-sm text-gray-900 max-w-[180px]">
+                      <span className="block truncate">{filename}</span>
+                    </td>
+                    <td className="px-3 py-3.5 text-sm text-gray-600 whitespace-nowrap">{log.user_name}</td>
+                    <td className="px-3 py-3.5 text-xs text-gray-400 whitespace-nowrap">{formatDate(log.created_at ?? '')}</td>
+                    <td className="px-3 py-3.5 text-sm text-gray-700 text-center">{log.total_records}</td>
+                    <td className="px-3 py-3.5 text-sm text-green-600 font-medium text-center">{log.success_count}</td>
+                    <td className={cn('px-3 py-3.5 text-sm font-medium text-center', log.failed_count > 0 ? 'text-red-500' : 'text-gray-400')}>{log.failed_count}</td>
                     <td className="px-3 py-3.5">
                       <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium w-fit', cfg.cls)}>
                         <StatusIcon className="w-3 h-3" />
@@ -221,15 +252,15 @@ export default function Logs() {
                   {/* Expanded detail */}
                   {isExpanded && (
                   <tr>
-                    <td colSpan={8} className="p-0">
+                    <td colSpan={9} className="p-0">
                     <div className="px-5 pb-4 pt-2 bg-gray-50/80 border-t border-gray-100 space-y-3">
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         {[
-                          { label: 'Log ID', value: log.id },
-                          { label: 'Upload Time', value: formatDateTime(log.uploadedAt) },
-                          { label: 'Database', value: log.databaseName ?? '—' },
-                          { label: 'SAP Reference', value: log.sapReference ?? '—' },
-                          { label: 'Status', value: log.status },
+                          { label: 'Log ID',          value: log.id ?? '—' },
+                          { label: 'Import Time',     value: formatDateTime(log.created_at ?? '') },
+                          { label: 'Business Object', value: log.biz_object_label },
+                          { label: 'SAP Reference',   value: log.sap_reference ?? '—' },
+                          { label: 'Status',          value: sk },
                         ].map(item => (
                           <div key={item.label} className="bg-white rounded-lg border border-gray-100 p-3">
                             <p className="text-xs text-gray-400">{item.label}</p>
@@ -240,12 +271,12 @@ export default function Logs() {
 
                       {log.errors.length > 0 && (
                         <div className="bg-white rounded-lg border border-red-100 p-3">
-                          <p className="text-xs font-semibold text-red-700 mb-2">Validation Errors ({log.errors.length})</p>
+                          <p className="text-xs font-semibold text-red-700 mb-2">Errors ({log.errors.length})</p>
                           <div className="max-h-36 overflow-y-auto scrollbar-thin space-y-1">
                             {log.errors.map((e, i) => (
                               <div key={i} className="flex items-start gap-2 text-xs text-red-600">
                                 <span className="font-mono bg-red-50 px-1.5 py-0.5 rounded flex-shrink-0">Row {e.row}</span>
-                                <span className="font-medium">{e.column}:</span>
+                                <span className="font-medium">{e.field}:</span>
                                 <span>{e.message}</span>
                               </div>
                             ))}
