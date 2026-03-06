@@ -3,6 +3,7 @@ import {
   useEffect, useRef, type ReactNode,
 } from 'react'
 import { sapLogin, sapLogout, type SapSession } from '@/lib/sapService'
+import { supabase } from '@/lib/supabase'
 import { COMPANIES } from '@/lib/databases'
 import type { Company } from '@/types/document'
 
@@ -112,6 +113,24 @@ export function SapProvider({ children }: { children: ReactNode }) {
       startRenewTimer(stored.company, stored.session)
     }
     return () => stopRenewTimer()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Clear SAP session when the user signs out ─────────────────────────────
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        stopRenewTimer()
+        clearStorage()
+        setSession(null)
+        setCompany(null)
+        setStatus('disconnected')
+        setErrorMessage('')
+        console.log('[SAP] Session cleared on user sign-out')
+      }
+    })
+    return () => subscription.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

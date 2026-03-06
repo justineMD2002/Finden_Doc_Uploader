@@ -17,6 +17,13 @@ export default defineConfig({
         target: 'https://47.250.53.233:50000',
         secure: false,
         changeOrigin: true,
+        configure(proxy) {
+          // Strip WWW-Authenticate so the browser never shows its native
+          // Basic Auth dialog on SAP 401 responses.
+          proxy.on('proxyRes', (proxyRes) => {
+            delete proxyRes.headers['www-authenticate']
+          })
+        },
       },
     },
   },
