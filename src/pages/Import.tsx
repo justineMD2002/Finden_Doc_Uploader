@@ -26,7 +26,7 @@ import {
 import { insertImportLog } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useSap } from '@/context/SapContext'
-import { runSapTest, runSapImport } from '@/lib/sapService'
+import { runSapTest, runSapImport, type ImportProgress } from '@/lib/sapService'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -1243,32 +1243,35 @@ function StepImport({
   onBack: () => void
   onReset: () => void
 }) {
-  const [running, setRunning] = useState<'test' | 'import' | null>(null)
-  const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
+  const [running,  setRunning]  = useState<'test' | 'import' | null>(null)
+  const [progress, setProgress] = useState<ImportProgress | null>(null)
+  const [docLabel, linesLabel]  = bizObject.tabLabels ?? ['Document', 'Document Lines']
   const mappedCount = mappings.filter(m => m.targetField.trim()).length
   const { session } = useSap()
 
   async function run(mode: 'test' | 'import') {
-    if (mode === 'import' && !session) {
+    if (!session) {
       toast.error('No active SAP session', { description: 'Please reconnect to SAP from the company selector.' })
       return
     }
     setRunning(mode)
+    setProgress(null)
     try {
       const r = mode === 'test'
-        ? await runSapTest(bizObject.id, docFile, linesFile, mappings)
-        : await runSapImport(bizObject.id, docFile, linesFile, mappings, session!.sessionId)
+        ? await runSapTest(bizObject.id, docFile, linesFile, mappings, session.sessionId, setProgress)
+        : await runSapImport(bizObject.id, docFile, linesFile, mappings, session.sessionId, errorHandling, setProgress)
       onResult(r)
       if (mode === 'import') {
         if (r.status === 'success') toast.success('Import completed successfully!', { description: `SAP Ref: ${r.sapReference}` })
         else if (r.status === 'partial') toast.warning('Import partially completed', { description: `${r.successCount} succeeded, ${r.failedCount} failed.` })
         else toast.error('Import failed', { description: `${r.failedCount} records failed.` })
       } else {
-        if (r.status === 'success') toast.success('Test import passed — no errors found.')
-        else toast.warning('Test import found issues', { description: `${r.failedCount} records would fail.` })
+        if (r.status === 'success') toast.success('Test passed — no errors found.')
+        else toast.warning('Test found issues', { description: `${r.failedCount} document(s) would fail.` })
       }
     } finally {
       setRunning(null)
+      setProgress(null)
     }
   }
 
@@ -1307,6 +1310,63 @@ function StepImport({
           )}
         </div>
       </div>
+
+      {/* ── Live progress ─────────────────────────────────────────────── */}
+      {running !== null && progress && (
+        <div className={cn(
+          'rounded-2xl border p-5 space-y-3',
+          progress.phase === 'rolling_back'
+            ? 'bg-red-50 border-red-200'
+            : running === 'test'
+            ? 'bg-purple-50 border-purple-200'
+            : 'bg-brand-50 border-brand-200',
+        )}>
+          {/* Phase label */}
+          <div className="flex items-center justify-between">
+            <p className={cn(
+              'text-sm font-semibold',
+              progress.phase === 'rolling_back' ? 'text-red-700'
+                : running === 'test' ? 'text-purple-700' : 'text-brand-700',
+            )}>
+              {progress.phase === 'validating' ? 'Validating...'
+                : progress.phase === 'rolling_back' ? 'Rolling back...'
+                : 'Importing...'}
+            </p>
+            <span className="text-xs font-mono text-gray-500">
+              {progress.current} / {progress.total}
+            </span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full h-2.5 bg-white/70 rounded-full overflow-hidden">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-300',
+                progress.phase === 'rolling_back' ? 'bg-red-500'
+                  : running === 'test' ? 'bg-purple-500' : 'bg-brand-600',
+              )}
+              style={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }}
+            />
+          </div>
+
+          {/* Current action */}
+          <p className="text-xs text-gray-600 truncate">{progress.action}</p>
+
+          {/* Live counters */}
+          {progress.phase !== 'rolling_back' && (
+            <div className="flex items-center gap-4 pt-1">
+              <span className="text-xs font-medium text-green-700">
+                ✓ {progress.successCount} succeeded
+              </span>
+              {progress.failedCount > 0 && (
+                <span className="text-xs font-medium text-red-600">
+                  ✗ {progress.failedCount} failed
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {!result && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
