@@ -3,7 +3,7 @@ import {
   TrendingUp, ShoppingCart, Package, ChevronRight, ChevronLeft,
   UploadCloud, FileSpreadsheet, X, CheckCircle2, XCircle, Loader2,
   ArrowRight, AlertTriangle, FlaskConical, Send, RotateCcw, Check,
-  AlertCircle, Info, Wand2,
+  AlertCircle, Info, Wand2, Download,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -414,11 +414,29 @@ function StepUploadFiles({
           <div className="space-y-3">
             <div className="flex items-start gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
               <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-blue-700">
-                Upload a single Excel file with <span className="font-semibold">{docLabel}</span> and{' '}
-                <span className="font-semibold">{linesLabel}</span> in separate sheets.
-                Name the lines sheet with the word <span className="font-semibold">"Line"</span> (e.g. "Document Lines") — sheets are detected automatically.
-              </p>
+              <div className="flex-1 flex items-start justify-between gap-3">
+                <p className="text-sm text-blue-700">
+                  Upload a single Excel file with <span className="font-semibold">{docLabel}</span> and{' '}
+                  <span className="font-semibold">{linesLabel}</span> in separate sheets.
+                  Name the lines sheet with the word <span className="font-semibold">"Line"</span> (e.g. "Document Lines") — sheets are detected automatically.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const url = 'https://tdthrilomqsntutgfkyp.supabase.co/storage/v1/object/public/templates/template.xlsx'
+                    const res = await fetch(url)
+                    const blob = await res.blob()
+                    const a = document.createElement('a')
+                    a.href = URL.createObjectURL(blob)
+                    a.download = 'template.xlsx'
+                    a.click()
+                    URL.revokeObjectURL(a.href)
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" /> Template
+                </button>
+              </div>
             </div>
             <UploadDropzone
               label="Excel file (.xlsx)"
