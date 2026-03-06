@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   ClipboardList, LogOut, UploadCloud,
-  User, ChevronDown, X, Save, Loader2, Database, RefreshCw,
+  User, ChevronDown, X, Save, Loader2, Database, RefreshCw, KeyRound, Eye, EyeOff,
 } from 'lucide-react'
 import findenLogo from '@/assets/finden_logo.png'
 import { useAuth } from '@/context/AuthContext'
@@ -18,18 +18,29 @@ const navItems = [
 // ─── Profile drawer ────────────────────────────────────────────────────────
 
 function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user, updateUser, logout } = useAuth()
+  const { user, updateUser, logout, changePassword } = useAuth()
   const navigate = useNavigate()
 
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [saving, setSaving] = useState(false)
 
+  // Password change
+  const [pwSection, setPwSection] = useState(false)
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [pwSaving, setPwSaving] = useState(false)
+
   // Sync fields when user changes or drawer opens
   useEffect(() => {
     if (open) {
       setName(user?.name ?? '')
       setEmail(user?.email ?? '')
+      setPwSection(false)
+      setNewPw('')
+      setConfirmPw('')
     }
   }, [open, user])
 
@@ -47,6 +58,22 @@ function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }
     toast.success('Logged out successfully')
     navigate('/login')
     onClose()
+  }
+
+  async function handleChangePassword() {
+    if (newPw.length < 6) { toast.error('Password must be at least 6 characters'); return }
+    if (newPw !== confirmPw) { toast.error('Passwords do not match'); return }
+    setPwSaving(true)
+    const { error } = await changePassword(newPw)
+    setPwSaving(false)
+    if (error) {
+      toast.error('Failed to change password', { description: error })
+    } else {
+      toast.success('Password changed successfully')
+      setNewPw('')
+      setConfirmPw('')
+      setPwSection(false)
+    }
   }
 
   const initials = user?.avatar ?? '?'
@@ -115,12 +142,59 @@ function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }
             />
           </div>
 
-          {/* <div className="space-y-1.5">
-            <label className="text-xs font-medium text-gray-600">Role</label>
-            <div className="px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl text-gray-500 capitalize select-none">
-              {user?.role}
-            </div>
-          </div> */}
+          {/* Password section */}
+          <div className="border-t border-gray-100 pt-5 space-y-3">
+            <button
+              onClick={() => setPwSection(v => !v)}
+              className="flex items-center justify-between w-full text-xs font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700 transition-colors"
+            >
+              <span className="flex items-center gap-1.5"><KeyRound className="w-3.5 h-3.5" /> Change Password</span>
+              <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', pwSection && 'rotate-180')} />
+            </button>
+
+            {pwSection && (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-600">New Password</label>
+                  <div className="relative">
+                    <input
+                      value={newPw}
+                      onChange={e => setNewPw(e.target.value)}
+                      type={showNew ? 'text' : 'password'}
+                      className="w-full px-3 py-2.5 pr-9 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-400"
+                      placeholder="Min. 6 characters"
+                    />
+                    <button type="button" onClick={() => setShowNew(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-gray-600">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      value={confirmPw}
+                      onChange={e => setConfirmPw(e.target.value)}
+                      type={showConfirm ? 'text' : 'password'}
+                      className="w-full px-3 py-2.5 pr-9 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-400"
+                      placeholder="Repeat new password"
+                    />
+                    <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <button
+                  onClick={handleChangePassword}
+                  disabled={!newPw || !confirmPw || pwSaving}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  {pwSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                  {pwSaving ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer actions */}

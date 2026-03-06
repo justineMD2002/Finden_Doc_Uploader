@@ -18,15 +18,15 @@ export const BIZ_CATEGORIES: { id: BizCategory; label: string; icon: string }[] 
 
 export const BIZ_OBJECTS: BizObject[] = [
   // Sales
-  { id: 'ar_credit_memo', label: 'AR Credit Memo', category: 'sales' },
-  { id: 'ar_invoice',     label: 'AR Invoice',     category: 'sales' },
   { id: 'delivery',       label: 'Delivery',       category: 'sales' },
   { id: 'return',         label: 'Return',         category: 'sales' },
+  { id: 'ar_invoice',     label: 'AR Invoice',     category: 'sales' },
+  { id: 'ar_credit_memo', label: 'AR Credit Memo', category: 'sales' },
   // Purchasing
+  { id: 'po',             label: 'PO',             category: 'purchasing' },
+  { id: 'grpo',           label: 'GRPO',           category: 'purchasing' },
   { id: 'ap_downpayment', label: 'AP Downpayment', category: 'purchasing' },
   { id: 'ap_invoice',     label: 'AP Invoice',     category: 'purchasing' },
-  { id: 'grpo',           label: 'GRPO',           category: 'purchasing' },
-  { id: 'po',             label: 'PO',             category: 'purchasing' },
   // Inventory
   { id: 'goods_issue',    label: 'Goods Issue',     category: 'inventory' },
   { id: 'goods_receipt',  label: 'Goods Receipt',   category: 'inventory' },

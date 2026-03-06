@@ -330,7 +330,7 @@ function ColumnsPreview({ columns }: { columns: string[] }) {
 function StepUploadFiles({
   bizObject, docFile, linesFile,
   docErrors, linesErrors,
-  onDocFile, onLinesFile, onDocRemove, onLinesRemove,
+  onBothFiles, onDocRemove, onLinesRemove,
   onNext, onBack,
 }: {
   bizObject: BizObject
@@ -338,31 +338,31 @@ function StepUploadFiles({
   linesFile: UploadedFile | null
   docErrors: CellValidationError[]
   linesErrors: CellValidationError[]
-  onDocFile: (f: File, sheet?: string) => Promise<void>
-  onLinesFile: (f: File, sheet?: string) => Promise<void>
+  onBothFiles: (f: File, docSheet: string, linesSheet: string) => Promise<void>
   onDocRemove: () => void
   onLinesRemove: () => void
   onNext: () => void
   onBack: () => void
 }) {
   const [activeTab, setActiveTab] = useState<'doc' | 'lines'>('doc')
-  const [loading, setLoading] = useState<'single' | null>(null)
-
-  // Single-file state
+  const [loading, setLoading] = useState(false)
   const [singleFile, setSingleFile] = useState<File | null>(null)
-  const [sheetNames, setSheetNames] = useState<string[]>([])
-  const [docSheet, setDocSheet] = useState<string>('')
-  const [linesSheet, setLinesSheet] = useState<string>('')
-  const [sheetLoading, setSheetLoading] = useState<'doc' | 'lines' | null>(null)
+  const [detectedSheets, setDetectedSheets] = useState<{ doc: string; lines: string } | null>(null)
 
   const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
   const bothLoaded = !!docFile && !!linesFile
   const totalErrors = docErrors.length + linesErrors.length
   const canProceed = bothLoaded && totalErrors === 0
 
-  // ── Single file handler ───────────────────────────────────────────────────
+  function detectSheets(names: string[]): { doc: string; lines: string } | null {
+    const linesSheet = names.find(n => /line/i.test(n))
+    const docSheet = names.find(n => n !== linesSheet)
+    if (!linesSheet || !docSheet) return null
+    return { doc: docSheet, lines: linesSheet }
+  }
+
   async function handleSingleFile(f: File) {
-    setLoading('single')
+    setLoading(true)
     try {
       const names = await getSheetNames(f)
       if (names.length < 2) {
@@ -371,40 +371,26 @@ function StepUploadFiles({
         })
         return
       }
+      const sheets = detectSheets(names)
+      if (!sheets) {
+        toast.error('Could not auto-detect sheets', {
+          description: `Name one sheet with "Line" or "Lines" (e.g. "Document Lines") so the system can tell them apart.`,
+        })
+        return
+      }
       setSingleFile(f)
-      setSheetNames(names)
-      setDocSheet('')
-      setLinesSheet('')
+      setDetectedSheets(sheets)
       onDocRemove()
       onLinesRemove()
+      await onBothFiles(f, sheets.doc, sheets.lines)
     } finally {
-      setLoading(null)
-    }
-  }
-
-  async function assignSheet(role: 'doc' | 'lines', sheet: string) {
-    if (!singleFile) return
-    const other = role === 'doc' ? linesSheet : docSheet
-    if (sheet === other && other !== '') {
-      toast.error('Each sheet must be assigned to a different role')
-      return
-    }
-    if (role === 'doc') setDocSheet(sheet)
-    else setLinesSheet(sheet)
-    setSheetLoading(role)
-    try {
-      if (role === 'doc') await onDocFile(singleFile, sheet)
-      else await onLinesFile(singleFile, sheet)
-    } finally {
-      setSheetLoading(null)
+      setLoading(false)
     }
   }
 
   function handleClearSingle() {
     setSingleFile(null)
-    setSheetNames([])
-    setDocSheet('')
-    setLinesSheet('')
+    setDetectedSheets(null)
     onDocRemove()
     onLinesRemove()
   }
@@ -423,89 +409,69 @@ function StepUploadFiles({
         </p>
       </div>
 
-      {/* ── Single file (multi-sheet) ──────────────────────────────────── */}
       <div className="space-y-4">
-          {!singleFile ? (
-            <div className="space-y-3">
-              <div className="flex items-start gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
-                <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-700">
-                  Upload a single Excel file that contains <span className="font-semibold">{docLabel}</span> and{' '}
-                  <span className="font-semibold">{linesLabel}</span> in <span className="font-semibold">separate sheets</span>.
-                  You will then assign each sheet to its role.
-                </p>
-              </div>
-              <UploadDropzone
-                label="Excel file (.xlsx)"
-                uploaded={null}
-                onFile={handleSingleFile}
-                onRemove={() => {}}
-                disabled={loading === 'single'}
-              />
-              {loading === 'single' && (
-                <div className="flex items-center gap-2 text-sm text-brand-600">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Detecting sheets...
-                </div>
-              )}
+        {!singleFile ? (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 px-4 py-3 bg-blue-50 border border-blue-200 rounded-xl">
+              <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-blue-700">
+                Upload a single Excel file with <span className="font-semibold">{docLabel}</span> and{' '}
+                <span className="font-semibold">{linesLabel}</span> in separate sheets.
+                Name the lines sheet with the word <span className="font-semibold">"Line"</span> (e.g. "Document Lines") — sheets are detected automatically.
+              </p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {/* File info + clear */}
-              <div className="flex items-center gap-3 px-4 py-3 bg-brand-50 border border-brand-200 rounded-xl">
-                <FileSpreadsheet className="w-5 h-5 text-brand-600 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 truncate">{singleFile.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{sheetNames.length} sheets detected</p>
-                </div>
+            <UploadDropzone
+              label="Excel file (.xlsx)"
+              uploaded={null}
+              onFile={handleSingleFile}
+              onRemove={() => {}}
+              disabled={loading}
+            />
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-brand-600">
+                <Loader2 className="w-4 h-4 animate-spin" /> Detecting sheets and reading data...
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* File info + detected sheets + clear */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-brand-50 border border-brand-200 rounded-xl">
+              <FileSpreadsheet className="w-5 h-5 text-brand-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">{singleFile.name}</p>
+                {detectedSheets && (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    <span className="font-medium text-gray-700">{docLabel}:</span>{' '}
+                    <span className="font-mono">{detectedSheets.doc}</span>
+                    {' · '}
+                    <span className="font-medium text-gray-700">{linesLabel}:</span>{' '}
+                    <span className="font-mono">{detectedSheets.lines}</span>
+                  </p>
+                )}
+              </div>
+              {!loading && (
                 <button onClick={handleClearSingle} className="p-1.5 rounded-lg hover:bg-brand-100 text-brand-700 transition-colors">
                   <X className="w-4 h-4" />
                 </button>
-              </div>
+              )}
+            </div>
 
-              {/* Sheet assignment */}
-              <div className="grid grid-cols-2 gap-4">
-                {([
-                  { role: 'doc' as const, label: docLabel, value: docSheet, file: docFile, errors: docErrors },
-                  { role: 'lines' as const, label: linesLabel, value: linesSheet, file: linesFile, errors: linesErrors },
-                ]).map(({ role, label, value, file, errors }) => (
-                  <div key={role} className="space-y-2">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{label} Sheet</p>
-                    <div className="space-y-1.5">
-                      {sheetNames.map(name => {
-                        const otherSelected = role === 'doc' ? linesSheet : docSheet
-                        const isSelected = value === name
-                        const isUsedByOther = otherSelected === name
-                        return (
-                          <button
-                            key={name}
-                            onClick={() => !isUsedByOther && assignSheet(role, name)}
-                            disabled={isUsedByOther || sheetLoading !== null}
-                            className={cn(
-                              'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl border text-sm text-left transition-all',
-                              isSelected
-                                ? 'border-brand-500 bg-brand-50 text-brand-700 font-semibold'
-                                : isUsedByOther
-                                ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                                : 'border-gray-200 bg-white text-gray-700 hover:border-brand-300 hover:bg-brand-50/40',
-                            )}
-                          >
-                            <FileSpreadsheet className={cn('w-4 h-4 shrink-0', isSelected ? 'text-brand-600' : 'text-gray-400')} />
-                            <span className="truncate flex-1">{name}</span>
-                            {isSelected && sheetLoading === role
-                              ? <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-600 shrink-0" />
-                              : isSelected
-                              ? <Check className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-                              : isUsedByOther
-                              ? <span className="text-[10px] text-gray-400 shrink-0">in use</span>
-                              : null
-                            }
-                          </button>
-                        )
-                      })}
-                    </div>
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-brand-600">
+                <Loader2 className="w-4 h-4 animate-spin" /> Reading data...
+              </div>
+            )}
+
+            {/* Sheet summaries */}
+            {bothLoaded && (
+              <div className="grid grid-cols-2 gap-3">
+                {([['doc', docLabel, docFile, docErrors], ['lines', linesLabel, linesFile, linesErrors]] as const).map(([role, label, file, errors]) => (
+                  <div key={role} className={cn('px-4 py-3 rounded-xl border', errors.length > 0 ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50')}>
+                    <p className="text-xs font-semibold text-gray-600 mb-1">{label}</p>
                     {file && errors.length === 0 && (
-                      <p className="text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> {file.rowCount} rows · {file.columns.length} cols
+                      <p className="text-xs text-green-700 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> {file.rowCount} rows · {file.columns.length} columns
                       </p>
                     )}
                     {errors.length > 0 && (
@@ -516,41 +482,42 @@ function StepUploadFiles({
                   </div>
                 ))}
               </div>
+            )}
 
-              {/* Column preview / errors for active assignment */}
-              {(docFile || linesFile) && (
-                <div className="space-y-3 border-t border-gray-100 pt-4">
-                  <div className="flex gap-0 border-b border-gray-200">
-                    {([['doc', docLabel, docFile, docErrors], ['lines', linesLabel, linesFile, linesErrors]] as const).map(([tab, label, file, errs]) => file && (
-                      <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={cn(
-                          'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                          activeTab === tab
-                            ? errs.length > 0 ? 'border-red-500 text-red-700' : 'border-brand-500 text-brand-700'
-                            : 'border-transparent text-gray-500 hover:text-gray-700',
-                        )}
-                      >
-                        {label}
-                        {errs.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-600 font-semibold">{errs.length}</span>}
-                      </button>
-                    ))}
-                  </div>
-                  {activeFile && activeErrors.length === 0 && <ColumnsPreview columns={activeFile.columns} />}
-                  {activeErrors.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
-                        <XCircle className="w-4 h-4" /> {activeErrors.length} validation error{activeErrors.length !== 1 ? 's' : ''} — fix your file and re-upload
-                      </p>
-                      <ValidationErrorTable errors={activeErrors} />
-                    </div>
-                  )}
+            {/* Column preview / errors for active tab */}
+            {(docFile || linesFile) && (
+              <div className="space-y-3 border-t border-gray-100 pt-4">
+                <div className="flex gap-0 border-b border-gray-200">
+                  {([['doc', docLabel, docFile, docErrors], ['lines', linesLabel, linesFile, linesErrors]] as const).map(([tab, label, file, errs]) => file && (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={cn(
+                        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
+                        activeTab === tab
+                          ? errs.length > 0 ? 'border-red-500 text-red-700' : 'border-brand-500 text-brand-700'
+                          : 'border-transparent text-gray-500 hover:text-gray-700',
+                      )}
+                    >
+                      {label}
+                      {errs.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-600 font-semibold">{errs.length}</span>}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
+                {activeFile && activeErrors.length === 0 && <ColumnsPreview columns={activeFile.columns} />}
+                {activeErrors.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
+                      <XCircle className="w-4 h-4" /> {activeErrors.length} validation error{activeErrors.length !== 1 ? 's' : ''} — fix your file and re-upload
+                    </p>
+                    <ValidationErrorTable errors={activeErrors} />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Errors block */}
       {bothLoaded && totalErrors > 0 && (
@@ -1517,22 +1484,15 @@ export default function Import() {
     setResult(null)
   }
 
-  async function handleDocFile(f: File, sheet?: string) {
-    const { columns, rowCount, rows } = await readFile(f, sheet)
-    const uploaded: UploadedFile = { file: f, columns, rowCount, rows }
-    const newMappings = buildMappings(columns, linesFile?.columns ?? [], bizObject)
-    setDocFile(uploaded)
+  async function handleBothFiles(f: File, docSheet: string, linesSheet: string) {
+    const [docData, linesData] = await Promise.all([readFile(f, docSheet), readFile(f, linesSheet)])
+    const docUploaded: UploadedFile = { file: f, columns: docData.columns, rowCount: docData.rowCount, rows: docData.rows }
+    const linesUploaded: UploadedFile = { file: f, columns: linesData.columns, rowCount: linesData.rowCount, rows: linesData.rows }
+    const newMappings = buildMappings(docData.columns, linesData.columns, bizObject)
+    setDocFile(docUploaded)
+    setLinesFile(linesUploaded)
     setMappings(newMappings)
-    runValidation(uploaded, linesFile, newMappings, bizObject)
-  }
-
-  async function handleLinesFile(f: File, sheet?: string) {
-    const { columns, rowCount, rows } = await readFile(f, sheet)
-    const uploaded: UploadedFile = { file: f, columns, rowCount, rows }
-    const newMappings = buildMappings(docFile?.columns ?? [], columns, bizObject)
-    setLinesFile(uploaded)
-    setMappings(newMappings)
-    runValidation(docFile, uploaded, newMappings, bizObject)
+    runValidation(docUploaded, linesUploaded, newMappings, bizObject)
   }
 
   function handleReset() {
@@ -1615,8 +1575,7 @@ export default function Import() {
             linesFile={linesFile}
             docErrors={docErrors}
             linesErrors={linesErrors}
-            onDocFile={handleDocFile}
-            onLinesFile={handleLinesFile}
+            onBothFiles={handleBothFiles}
             onDocRemove={() => {
               const newMappings = buildMappings([], linesFile?.columns ?? [], bizObject)
               setDocFile(null); setDocErrors([]); setMappings(newMappings)
