@@ -1,4 +1,5 @@
 import type { UploadLog, ValidationError } from '@/types/document'
+import type { ImportResult, BizObject } from '@/types/wizard'
 import { generateId } from '@/lib/utils'
 
 const LOGS_KEY = 'pixelcare_upload_logs'
@@ -15,6 +16,37 @@ export function getLogs(): UploadLog[] {
 
 function saveLogs(logs: UploadLog[]) {
   localStorage.setItem(LOGS_KEY, JSON.stringify(logs))
+}
+
+export function saveImportLog(
+  result: ImportResult,
+  bizObject: BizObject,
+  docFilename: string | null,
+  uploadedBy: string,
+  companyName: string,
+) {
+  const statusMap: Record<ImportResult['status'], UploadLog['status']> = {
+    success: 'SUCCESS',
+    failed:  'FAILED',
+    partial: 'PARTIAL',
+  }
+
+  const log: UploadLog = {
+    id:           generateId(),
+    filename:     docFilename ?? 'unknown',
+    uploadedBy,
+    uploadedAt:   result.timestamp,
+    rowCount:     result.totalRecords,
+    successCount: result.successCount,
+    failedCount:  result.failedCount,
+    status:       statusMap[result.status],
+    sapReference: result.sapReference,
+    errors:       result.errors.map(e => ({ row: e.row, column: e.field, message: e.message })),
+    databaseName: companyName,
+    module:       bizObject.label,
+  }
+
+  saveLogs([log, ...getLogs()])
 }
 
 export async function submitToSAP(
