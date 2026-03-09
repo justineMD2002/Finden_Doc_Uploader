@@ -423,7 +423,7 @@ function StepUploadFiles({
                 <button
                   type="button"
                   onClick={async () => {
-                    const url = 'https://tdthrilomqsntutgfkyp.supabase.co/storage/v1/object/public/templates/template.xlsx'
+                    const url = 'https://tdthrilomqsntutgfkyp.supabase.co/storage/v1/object/public/templates/po_template.xlsx'
                     const res = await fetch(url)
                     const blob = await res.blob()
                     const a = document.createElement('a')
