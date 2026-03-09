@@ -428,7 +428,7 @@ function StepUploadFiles({
                     const blob = await res.blob()
                     const a = document.createElement('a')
                     a.href = URL.createObjectURL(blob)
-                    a.download = 'template.xlsx'
+                    a.download = 'po_template.xlsx'
                     a.click()
                     URL.revokeObjectURL(a.href)
                   }}
