@@ -406,6 +406,270 @@ const RETURN_LINES_AUTO_MAP: AutoMapTable = {
   'Tax Code':                  'TaxCode',
 }
 
+// ─── AP Downpayment ────────────────────────────────────────────────────────
+
+const AP_DOWNPAYMENT_DOC_FIELDS: SapFieldDef[] = [
+  { field: 'DocNum',    description: 'Document Number',   type: 'long',   fieldLength: 11,  mandatory: true, isKey: true, notes: 'Key field. Also used as ParentKey in Lines.' },
+  { field: 'CardCode',  description: 'Vendor Code',       type: 'string', fieldLength: 15,  mandatory: true, relatedTable: 'OCRD' },
+  { field: 'DocDate',   description: 'Posting Date',      type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'CardName',  description: 'Vendor Name',       type: 'string', fieldLength: 100 },
+  { field: 'NumAtCard', description: 'Vendor Ref No.',    type: 'string', fieldLength: 100 },
+  { field: 'DocTotal',  description: 'Document Total',    type: 'double', fieldLength: 40 },
+  { field: 'Comments',  description: 'Remarks',           type: 'string', fieldLength: 254 },
+]
+
+const AP_DOWNPAYMENT_LINES_FIELDS: SapFieldDef[] = [
+  { field: 'ParentKey',      description: 'Parent Document Key',           type: 'long',   mandatory: true, isParentKey: true },
+  { field: 'ItemCode',       description: 'Item No.',                      type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'LineNum',        description: 'Line Number',                   type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemDescription',description: 'Item / Service Description',    type: 'string', fieldLength: 100 },
+  { field: 'Quantity',       description: 'Quantity',                      type: 'double', fieldLength: 40 },
+  { field: 'Price',          description: 'Unit Price',                    type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',  description: 'Warehouse Code',                type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'WTaxAmount',     description: 'Withholding Tax Amount',        type: 'double', fieldLength: 40 },
+]
+
+const AP_DOWNPAYMENT_DOC_AUTO_MAP: AutoMapTable = {
+  'Document No':    'DocNum',
+  'Vendor Code':    'CardCode',
+  'Posting Date':   'DocDate',
+  'Vendor Name':    'CardName',
+  'Vendor Ref No':  'NumAtCard',
+  'Document Total': 'DocTotal',
+  'Remarks':        'Comments',
+}
+
+const AP_DOWNPAYMENT_LINES_AUTO_MAP: AutoMapTable = {
+  'Document No':               'ParentKey',
+  'Item Code':                 'ItemCode',
+  'Line No':                   'LineNum',
+  'Item / Service Description':'ItemDescription',
+  'Ordered Quantity':          'Quantity',
+  'Unit Price':                'Price',
+  'Warehouse':                 'WarehouseCode',
+  'Wtax Amount':               'WTaxAmount',
+}
+
+// ─── AP Invoice ────────────────────────────────────────────────────────────
+
+const AP_INVOICE_DOC_FIELDS: SapFieldDef[] = [
+  { field: 'DocNum',      description: 'Document Number',   type: 'long',   fieldLength: 11,  mandatory: true, isKey: true, notes: 'Key field. Also used as ParentKey in Lines.' },
+  { field: 'CardCode',    description: 'Vendor Code',       type: 'string', fieldLength: 15,  mandatory: true, relatedTable: 'OCRD' },
+  { field: 'DocDate',     description: 'Posting Date',      type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'CardName',    description: 'Vendor Name',       type: 'string', fieldLength: 100 },
+  { field: 'NumAtCard',   description: 'Vendor Ref No.',    type: 'string', fieldLength: 100 },
+  { field: 'DocTotal',    description: 'Document Total',    type: 'double', fieldLength: 40 },
+  { field: 'Comments',    description: 'Remarks',           type: 'string', fieldLength: 254 },
+  { field: 'LicTradNum',  description: 'Federal Tax ID',    type: 'string', fieldLength: 32 },
+]
+
+const AP_INVOICE_LINES_FIELDS: SapFieldDef[] = [
+  { field: 'ParentKey',      description: 'Parent Document Key',           type: 'long',   mandatory: true, isParentKey: true },
+  { field: 'ItemCode',       description: 'Item No.',                      type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'LineNum',        description: 'Line Number',                   type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemDescription',description: 'Item / Service Description',    type: 'string', fieldLength: 100 },
+  { field: 'Quantity',       description: 'Quantity',                      type: 'double', fieldLength: 40 },
+  { field: 'Price',          description: 'Unit Price',                    type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',  description: 'Warehouse Code',                type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'WTCode',         description: 'Withholding Tax Code',          type: 'string', fieldLength: 8 },
+]
+
+const AP_INVOICE_DOC_AUTO_MAP: AutoMapTable = {
+  'Document No':    'DocNum',
+  'Vendor Code':    'CardCode',
+  'Posting Date':   'DocDate',
+  'Vendor Name':    'CardName',
+  'Vendor Ref No':  'NumAtCard',
+  'Document Total': 'DocTotal',
+  'Remarks':        'Comments',
+  'Federal Tax ID': 'LicTradNum',
+}
+
+const AP_INVOICE_LINES_AUTO_MAP: AutoMapTable = {
+  'Document No':               'ParentKey',
+  'Item Code':                 'ItemCode',
+  'Line No':                   'LineNum',
+  'Item / Service Description':'ItemDescription',
+  'Ordered Quantity':          'Quantity',
+  'Unit Price':                'Price',
+  'Warehouse':                 'WarehouseCode',
+  'Wtax Code':                 'WTCode',
+}
+
+// ─── AR Invoice ────────────────────────────────────────────────────────────
+
+const AR_INVOICE_DOC_FIELDS: SapFieldDef[] = [
+  { field: 'DocNum',    description: 'Document Number',    type: 'long',   fieldLength: 11, mandatory: true, isKey: true, notes: 'Key field. Also used as ParentKey in Lines.' },
+  { field: 'DocDate',   description: 'Posting Date',       type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'DocTotal',  description: 'Net Price Amount',   type: 'double', fieldLength: 40 },
+  { field: 'Comments',  description: 'Remarks',            type: 'string', fieldLength: 254 },
+]
+
+const AR_INVOICE_LINES_FIELDS: SapFieldDef[] = [
+  { field: 'ParentKey',        description: 'Parent Document Key',           type: 'long',   mandatory: true, isParentKey: true },
+  { field: 'ItemCode',         description: 'Item No.',                      type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'LineNum',          description: 'Line Number',                   type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemDescription',  description: 'Item / Service Description',    type: 'string', fieldLength: 100 },
+  { field: 'Quantity',         description: 'Quantity',                      type: 'double', fieldLength: 40 },
+  { field: 'Price',            description: 'Unit Price',                    type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',    description: 'Warehouse Code',                type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'TaxCode',          description: 'Tax Code',                      type: 'string', fieldLength: 8,  relatedTable: 'OSTC' },
+  { field: 'OcrCode',          description: 'Distribution Rule 1 (Dept)',    type: 'string', fieldLength: 8 },
+  { field: 'OcrCode2',         description: 'Distribution Rule 2',           type: 'string', fieldLength: 8 },
+  { field: 'OcrCode3',         description: 'Distribution Rule 3',           type: 'string', fieldLength: 8 },
+  { field: 'COGSDistribRule',  description: 'COGS Distribution Rule 1',      type: 'string', fieldLength: 8 },
+  { field: 'COGSDistribRule2', description: 'COGS Distribution Rule 2',      type: 'string', fieldLength: 8 },
+  { field: 'COGSDistribRule3', description: 'COGS Distribution Rule 3',      type: 'string', fieldLength: 8 },
+]
+
+const AR_INVOICE_DOC_AUTO_MAP: AutoMapTable = {
+  'Document No':      'DocNum',
+  'Posting Date':     'DocDate',
+  'Net Price Amount': 'DocTotal',
+  'Remarks':          'Comments',
+}
+
+const AR_INVOICE_LINES_AUTO_MAP: AutoMapTable = {
+  'Purchase Order No':         'ParentKey',
+  'Item Code':                 'ItemCode',
+  'Line No':                   'LineNum',
+  'Item / Service Description':'ItemDescription',
+  'Ordered Quantity':          'Quantity',
+  'Unit Price':                'Price',
+  'Warehouse':                 'WarehouseCode',
+  'Tax Code':                  'TaxCode',
+  'Department Name':           'OcrCode',
+  'Ocr Name 2':                'OcrCode2',
+  'Ocr Name 3':                'OcrCode3',
+  'COGS Dist Rule 1':          'COGSDistribRule',
+  'COGS Dist Rule 2':          'COGSDistribRule2',
+  'COGS Dist Rule 3':          'COGSDistribRule3',
+}
+
+// ─── Delivery ──────────────────────────────────────────────────────────────
+
+const DELIVERY_DOC_FIELDS: SapFieldDef[] = [
+  { field: 'DocNum',   description: 'Delivery Number',  type: 'long',   fieldLength: 11, mandatory: true, isKey: true, notes: 'Key field. Also used as ParentKey in Lines.' },
+  { field: 'DocDate',  description: 'Date Created',     type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'TaxDate',  description: 'Document Date',    type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'Comments', description: 'Remarks',          type: 'string', fieldLength: 254 },
+]
+
+const DELIVERY_LINES_FIELDS: SapFieldDef[] = [
+  { field: 'ParentKey',    description: 'Parent Document Key',  type: 'long',   mandatory: true, isParentKey: true },
+  { field: 'ItemCode',     description: 'Item No.',             type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'Quantity',     description: 'Quantity',             type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',description: 'Warehouse Code',       type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'OcrCode',      description: 'COG Branch / Dist Rule 1', type: 'string', fieldLength: 8 },
+]
+
+const DELIVERY_DOC_AUTO_MAP: AutoMapTable = {
+  'DR Delivery Number': 'DocNum',
+  'Date Created':       'DocDate',
+  'DR DocDate':         'TaxDate',
+  'DCS Remarks':        'Comments',
+}
+
+const DELIVERY_LINES_AUTO_MAP: AutoMapTable = {
+  'DR Delivery Number': 'ParentKey',
+  'Item Code':          'ItemCode',
+  'Quantity':           'Quantity',
+  'WHSE':               'WarehouseCode',
+  'COG Branch':         'OcrCode',
+}
+
+// ─── Goods Issue ───────────────────────────────────────────────────────────
+
+const GOODS_ISSUE_DOC_FIELDS: SapFieldDef[] = [
+  { field: 'DocNum',   description: 'Goods Issue Number', type: 'long',   fieldLength: 11, mandatory: true, isKey: true, notes: 'Key field. Also used as ParentKey in Lines.' },
+  { field: 'DocDate',  description: 'Posting Date',       type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'TaxDate',  description: 'Document Date',      type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'Comments', description: 'Remarks',            type: 'string', fieldLength: 254 },
+]
+
+const GOODS_ISSUE_LINES_FIELDS: SapFieldDef[] = [
+  { field: 'ParentKey',    description: 'Parent Document Key',        type: 'long',   mandatory: true, isParentKey: true },
+  { field: 'ItemCode',     description: 'Item No.',                   type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'LineNum',      description: 'Line Number',                type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemDescription', description: 'Item Description',        type: 'string', fieldLength: 100 },
+  { field: 'Quantity',     description: 'Quantity',                   type: 'double', fieldLength: 40 },
+  { field: 'Price',        description: 'Unit Price',                 type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',description: 'Warehouse Code',             type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'OcrCode',      description: 'Cost Center / Dist Rule 1',  type: 'string', fieldLength: 8 },
+  { field: 'OcrCode2',     description: 'Distribution Rule 2',        type: 'string', fieldLength: 8 },
+  { field: 'OcrCode3',     description: 'Distribution Rule 3',        type: 'string', fieldLength: 8 },
+  { field: 'OcrCode4',     description: 'Distribution Rule 4',        type: 'string', fieldLength: 8 },
+  { field: 'OcrCode5',     description: 'Distribution Rule 5',        type: 'string', fieldLength: 8 },
+]
+
+const GOODS_ISSUE_DOC_AUTO_MAP: AutoMapTable = {
+  'Goods Issue No': 'DocNum',
+  'Posting Date':   'DocDate',
+  'Document Date':  'TaxDate',
+  'Remarks':        'Comments',
+}
+
+const GOODS_ISSUE_LINES_AUTO_MAP: AutoMapTable = {
+  'Goods Issue No':  'ParentKey',
+  'Item Code':       'ItemCode',
+  'Line No':         'LineNum',
+  'Item Description':'ItemDescription',
+  'Quantity':        'Quantity',
+  'Unit Price':      'Price',
+  'Warehouse':       'WarehouseCode',
+  'Cost Center 1':   'OcrCode',
+  'Cost Center 2':   'OcrCode2',
+  'Cost Center 3':   'OcrCode3',
+  'Cost Center 4':   'OcrCode4',
+  'Cost Center 5':   'OcrCode5',
+}
+
+// ─── Goods Receipt ─────────────────────────────────────────────────────────
+
+const GOODS_RECEIPT_DOC_FIELDS: SapFieldDef[] = [
+  { field: 'DocNum',   description: 'Goods Receipt Number', type: 'long',   fieldLength: 11, mandatory: true, isKey: true, notes: 'Key field. Also used as ParentKey in Lines.' },
+  { field: 'DocDate',  description: 'Posting Date',         type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'TaxDate',  description: 'Document Date',        type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'Comments', description: 'Remarks',              type: 'string', fieldLength: 254 },
+]
+
+const GOODS_RECEIPT_LINES_FIELDS: SapFieldDef[] = [
+  { field: 'ParentKey',    description: 'Parent Document Key',        type: 'long',   mandatory: true, isParentKey: true },
+  { field: 'ItemCode',     description: 'Item No.',                   type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'LineNum',      description: 'Line Number',                type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemDescription', description: 'Item Description',        type: 'string', fieldLength: 100 },
+  { field: 'Quantity',     description: 'Quantity',                   type: 'double', fieldLength: 40 },
+  { field: 'Price',        description: 'Unit Price',                 type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',description: 'Warehouse Code',             type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'OcrCode',      description: 'Cost Center / Dist Rule 1',  type: 'string', fieldLength: 8 },
+  { field: 'OcrCode2',     description: 'Distribution Rule 2',        type: 'string', fieldLength: 8 },
+  { field: 'OcrCode3',     description: 'Distribution Rule 3',        type: 'string', fieldLength: 8 },
+  { field: 'OcrCode4',     description: 'Distribution Rule 4',        type: 'string', fieldLength: 8 },
+  { field: 'OcrCode5',     description: 'Distribution Rule 5',        type: 'string', fieldLength: 8 },
+]
+
+const GOODS_RECEIPT_DOC_AUTO_MAP: AutoMapTable = {
+  'Goods Receipt No': 'DocNum',
+  'Posting Date':     'DocDate',
+  'Document Date':    'TaxDate',
+  'Remarks':          'Comments',
+}
+
+const GOODS_RECEIPT_LINES_AUTO_MAP: AutoMapTable = {
+  'Goods Receipt No': 'ParentKey',
+  'Item Code':        'ItemCode',
+  'Line No':          'LineNum',
+  'Item Description': 'ItemDescription',
+  'Quantity':         'Quantity',
+  'Unit Price':       'Price',
+  'Warehouse':        'WarehouseCode',
+  'Cost Center 1':    'OcrCode',
+  'Cost Center 2':    'OcrCode2',
+  'Cost Center 3':    'OcrCode3',
+  'Cost Center 4':    'OcrCode4',
+  'Cost Center 5':    'OcrCode5',
+}
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 
 const REGISTRY: Record<string, BizObjectConfig> = {
@@ -428,6 +692,36 @@ const REGISTRY: Record<string, BizObjectConfig> = {
     fields: { doc: RETURN_DOC_FIELDS, lines: RETURN_LINES_FIELDS },
     docAutoMap: RETURN_DOC_AUTO_MAP,
     linesAutoMap: RETURN_LINES_AUTO_MAP,
+  },
+  ap_downpayment: {
+    fields: { doc: AP_DOWNPAYMENT_DOC_FIELDS, lines: AP_DOWNPAYMENT_LINES_FIELDS },
+    docAutoMap: AP_DOWNPAYMENT_DOC_AUTO_MAP,
+    linesAutoMap: AP_DOWNPAYMENT_LINES_AUTO_MAP,
+  },
+  ap_invoice: {
+    fields: { doc: AP_INVOICE_DOC_FIELDS, lines: AP_INVOICE_LINES_FIELDS },
+    docAutoMap: AP_INVOICE_DOC_AUTO_MAP,
+    linesAutoMap: AP_INVOICE_LINES_AUTO_MAP,
+  },
+  ar_invoice: {
+    fields: { doc: AR_INVOICE_DOC_FIELDS, lines: AR_INVOICE_LINES_FIELDS },
+    docAutoMap: AR_INVOICE_DOC_AUTO_MAP,
+    linesAutoMap: AR_INVOICE_LINES_AUTO_MAP,
+  },
+  delivery: {
+    fields: { doc: DELIVERY_DOC_FIELDS, lines: DELIVERY_LINES_FIELDS },
+    docAutoMap: DELIVERY_DOC_AUTO_MAP,
+    linesAutoMap: DELIVERY_LINES_AUTO_MAP,
+  },
+  goods_issue: {
+    fields: { doc: GOODS_ISSUE_DOC_FIELDS, lines: GOODS_ISSUE_LINES_FIELDS },
+    docAutoMap: GOODS_ISSUE_DOC_AUTO_MAP,
+    linesAutoMap: GOODS_ISSUE_LINES_AUTO_MAP,
+  },
+  goods_receipt: {
+    fields: { doc: GOODS_RECEIPT_DOC_FIELDS, lines: GOODS_RECEIPT_LINES_FIELDS },
+    docAutoMap: GOODS_RECEIPT_DOC_AUTO_MAP,
+    linesAutoMap: GOODS_RECEIPT_LINES_AUTO_MAP,
   },
 }
 

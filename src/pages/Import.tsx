@@ -428,6 +428,12 @@ function StepUploadFiles({
                       ar_credit_memo: 'ar_credit_memo_template.xlsx',
                       grpo:           'grpo_template.xlsx',
                       return:         'return_template.xlsx',
+                      ap_downpayment: 'ap_downpayment.xlsx',
+                      ap_invoice:     'ap_invoice.xlsx',
+                      ar_invoice:     'ar_invoice_template.xlsx',
+                      delivery:       'delivery_template.xlsx',
+                      goods_issue:    'goods_issue_template.xlsx',
+                      goods_receipt:  'goods_receipt_template.xlsx',
                     }
                     const filename = TEMPLATE_MAP[bizObject.id] ?? `${bizObject.id}_template.xlsx`
                     const url = `https://tdthrilomqsntutgfkyp.supabase.co/storage/v1/object/public/templates/${filename}`
