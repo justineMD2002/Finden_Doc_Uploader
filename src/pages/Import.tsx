@@ -423,12 +423,19 @@ function StepUploadFiles({
                 <button
                   type="button"
                   onClick={async () => {
-                    const url = 'https://tdthrilomqsntutgfkyp.supabase.co/storage/v1/object/public/templates/po_template.xlsx'
+                    const TEMPLATE_MAP: Record<string, string> = {
+                      po:             'po_template.xlsx',
+                      ar_credit_memo: 'ar_credit_memo_template.xlsx',
+                      grpo:           'grpo_template.xlsx',
+                      return:         'return_template.xlsx',
+                    }
+                    const filename = TEMPLATE_MAP[bizObject.id] ?? `${bizObject.id}_template.xlsx`
+                    const url = `https://tdthrilomqsntutgfkyp.supabase.co/storage/v1/object/public/templates/${filename}`
                     const res = await fetch(url)
                     const blob = await res.blob()
                     const a = document.createElement('a')
                     a.href = URL.createObjectURL(blob)
-                    a.download = 'po_template.xlsx'
+                    a.download = filename
                     a.click()
                     URL.revokeObjectURL(a.href)
                   }}

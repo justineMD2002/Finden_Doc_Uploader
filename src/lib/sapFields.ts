@@ -199,6 +199,213 @@ const PO_LINES_AUTO_MAP: AutoMapTable = {
   'Tax Code':                      'TaxCode',
 }
 
+// ─── AR Credit Memo ────────────────────────────────────────────────────────
+
+const AR_CREDIT_MEMO_DOC_FIELDS: SapFieldDef[] = [
+  {
+    field: 'DocNum',
+    description: 'Credit Memo Number',
+    type: 'long',
+    fieldLength: 11,
+    mandatory: true,
+    isKey: true,
+    notes: 'Key field. Also used as ParentKey reference in the Lines file.',
+  },
+  {
+    field: 'DocType',
+    description: 'Document Type',
+    type: 'enum',
+    validValues: ['dDocument_Items', 'dDocument_Service'],
+  },
+  { field: 'DocDate',    description: 'Posting Date',       type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'DocDueDate', description: 'Due Date',           type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'TaxDate',    description: 'Document Date',      type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'CardCode',   description: 'Customer Code',      type: 'string', fieldLength: 15,  mandatory: true, relatedTable: 'OCRD' },
+  { field: 'CardName',   description: 'Customer Name',      type: 'string', fieldLength: 100 },
+  { field: 'NumAtCard',  description: 'Customer Ref No.',   type: 'string', fieldLength: 100 },
+  { field: 'Series',     description: 'Document Series',    type: 'long',   fieldLength: 11,  relatedTable: 'NNM1' },
+  { field: 'DocTotal',   description: 'Document Total',     type: 'double', fieldLength: 40 },
+  { field: 'Comments',   description: 'Remarks',            type: 'string', fieldLength: 254 },
+]
+
+const AR_CREDIT_MEMO_LINES_FIELDS: SapFieldDef[] = [
+  {
+    field: 'ParentKey',
+    description: 'Parent Document Key',
+    type: 'long',
+    mandatory: true,
+    isParentKey: true,
+    notes: 'Must match the DocNum value from the Documents file.',
+  },
+  { field: 'LineNum',         description: 'Line Number',                  type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemCode',        description: 'Item No.',                     type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'ItemDescription', description: 'Item / Service Description',   type: 'string', fieldLength: 100 },
+  { field: 'Quantity',        description: 'Quantity',                     type: 'double', fieldLength: 40 },
+  { field: 'Price',           description: 'Unit Price',                   type: 'double', fieldLength: 40 },
+  { field: 'TaxCode',         description: 'Tax Code',                     type: 'string', fieldLength: 8,  relatedTable: 'OSTC' },
+]
+
+const AR_CREDIT_MEMO_DOC_AUTO_MAP: AutoMapTable = {
+  'Credit Memo No':           'DocNum',
+  'Customer Code':            'CardCode',
+  'Posting Date':             'DocDate',
+  'Due Date':                 'DocDueDate',
+  'Document Date':            'TaxDate',
+  'Customer Name':            'CardName',
+  'Customer Ref No':          'NumAtCard',
+  'Document Series':          'Series',
+  'Total Amount (Incl. VAT)': 'DocTotal',
+  'Remarks':                  'Comments',
+}
+
+const AR_CREDIT_MEMO_LINES_AUTO_MAP: AutoMapTable = {
+  'Credit Memo No':            'ParentKey',
+  'Item Code':                 'ItemCode',
+  'Item / Service Description':'ItemDescription',
+  'Quantity':                  'Quantity',
+  'Unit Price':                'Price',
+  'Tax Code':                  'TaxCode',
+}
+
+// ─── GRPO ──────────────────────────────────────────────────────────────────
+
+const GRPO_DOC_FIELDS: SapFieldDef[] = [
+  {
+    field: 'DocNum',
+    description: 'GRPO Number',
+    type: 'long',
+    fieldLength: 11,
+    mandatory: true,
+    isKey: true,
+    notes: 'Key field. Also used as ParentKey reference in the Lines file.',
+  },
+  {
+    field: 'DocType',
+    description: 'Document Type',
+    type: 'enum',
+    validValues: ['dDocument_Items', 'dDocument_Service'],
+  },
+  { field: 'DocDate',    description: 'Posting Date',     type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'DocDueDate', description: 'Due Date',         type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'TaxDate',    description: 'Document Date',    type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'CardCode',   description: 'Vendor Code',      type: 'string', fieldLength: 15,  mandatory: true, relatedTable: 'OCRD' },
+  { field: 'CardName',   description: 'Vendor Name',      type: 'string', fieldLength: 100 },
+  { field: 'NumAtCard',  description: 'Vendor Ref No.',   type: 'string', fieldLength: 100 },
+  { field: 'Series',     description: 'Document Series',  type: 'long',   fieldLength: 11,  relatedTable: 'NNM1' },
+  { field: 'DocTotal',   description: 'Document Total',   type: 'double', fieldLength: 40 },
+  { field: 'Comments',   description: 'Remarks',          type: 'string', fieldLength: 254 },
+]
+
+const GRPO_LINES_FIELDS: SapFieldDef[] = [
+  {
+    field: 'ParentKey',
+    description: 'Parent Document Key',
+    type: 'long',
+    mandatory: true,
+    isParentKey: true,
+    notes: 'Must match the DocNum value from the Documents file.',
+  },
+  { field: 'LineNum',         description: 'Line Number',                  type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemCode',        description: 'Item No.',                     type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'ItemDescription', description: 'Item / Service Description',   type: 'string', fieldLength: 100 },
+  { field: 'Quantity',        description: 'Quantity',                     type: 'double', fieldLength: 40 },
+  { field: 'Price',           description: 'Unit Price',                   type: 'double', fieldLength: 40 },
+  { field: 'TaxCode',         description: 'Tax Code',                     type: 'string', fieldLength: 8,  relatedTable: 'OSTC' },
+]
+
+const GRPO_DOC_AUTO_MAP: AutoMapTable = {
+  'GRPO No':                  'DocNum',
+  'Vendor Code':              'CardCode',
+  'Posting Date':             'DocDate',
+  'Due Date':                 'DocDueDate',
+  'Document Date':            'TaxDate',
+  'Vendor Name':              'CardName',
+  'Vendor Ref No':            'NumAtCard',
+  'Document Series':          'Series',
+  'Total Amount (Incl. VAT)': 'DocTotal',
+  'Remarks':                  'Comments',
+}
+
+const GRPO_LINES_AUTO_MAP: AutoMapTable = {
+  'GRPO No':                   'ParentKey',
+  'Item Code':                 'ItemCode',
+  'Item / Service Description':'ItemDescription',
+  'Quantity':                  'Quantity',
+  'Unit Price':                'Price',
+  'Tax Code':                  'TaxCode',
+}
+
+// ─── Return ────────────────────────────────────────────────────────────────
+
+const RETURN_DOC_FIELDS: SapFieldDef[] = [
+  {
+    field: 'DocNum',
+    description: 'Return Number',
+    type: 'long',
+    fieldLength: 11,
+    mandatory: true,
+    isKey: true,
+    notes: 'Key field. Also used as ParentKey reference in the Lines file.',
+  },
+  {
+    field: 'DocType',
+    description: 'Document Type',
+    type: 'enum',
+    validValues: ['dDocument_Items', 'dDocument_Service'],
+  },
+  { field: 'DocDate',    description: 'Posting Date',     type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'DocDueDate', description: 'Due Date',         type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'TaxDate',    description: 'Document Date',    type: 'date',   format: 'YYYYMMDD', fieldLength: 8 },
+  { field: 'CardCode',   description: 'Vendor Code',      type: 'string', fieldLength: 15,  mandatory: true, relatedTable: 'OCRD' },
+  { field: 'CardName',   description: 'Vendor Name',      type: 'string', fieldLength: 100 },
+  { field: 'NumAtCard',  description: 'Vendor Ref No.',   type: 'string', fieldLength: 100 },
+  { field: 'Series',     description: 'Document Series',  type: 'long',   fieldLength: 11,  relatedTable: 'NNM1' },
+  { field: 'DocTotal',   description: 'Document Total',   type: 'double', fieldLength: 40 },
+  { field: 'Comments',   description: 'Remarks',          type: 'string', fieldLength: 254 },
+]
+
+const RETURN_LINES_FIELDS: SapFieldDef[] = [
+  {
+    field: 'ParentKey',
+    description: 'Parent Document Key',
+    type: 'long',
+    mandatory: true,
+    isParentKey: true,
+    notes: 'Must match the DocNum value from the Documents file.',
+  },
+  { field: 'LineNum',         description: 'Line Number',                  type: 'long',   notes: '0-based integer.' },
+  { field: 'ItemCode',        description: 'Item No.',                     type: 'string', fieldLength: 50, mandatory: true, relatedTable: 'OITM' },
+  { field: 'ItemDescription', description: 'Item / Service Description',   type: 'string', fieldLength: 100 },
+  { field: 'Quantity',        description: 'Quantity',                     type: 'double', fieldLength: 40 },
+  { field: 'Price',           description: 'Unit Price',                   type: 'double', fieldLength: 40 },
+  { field: 'WarehouseCode',   description: 'Warehouse Code',               type: 'string', fieldLength: 8,  relatedTable: 'OWHS' },
+  { field: 'TaxCode',         description: 'Tax Code',                     type: 'string', fieldLength: 8,  relatedTable: 'OSTC' },
+]
+
+const RETURN_DOC_AUTO_MAP: AutoMapTable = {
+  'Return No':                'DocNum',
+  'Vendor Code':              'CardCode',
+  'Posting Date':             'DocDate',
+  'Due Date':                 'DocDueDate',
+  'Document Date':            'TaxDate',
+  'Vendor Name':              'CardName',
+  'Vendor Ref No':            'NumAtCard',
+  'Document Series':          'Series',
+  'Total Amount (Incl. VAT)': 'DocTotal',
+  'Remarks':                  'Comments',
+}
+
+const RETURN_LINES_AUTO_MAP: AutoMapTable = {
+  'Return No':                 'ParentKey',
+  'Item Code':                 'ItemCode',
+  'Line No':                   'LineNum',
+  'Item / Service Description':'ItemDescription',
+  'Quantity':                  'Quantity',
+  'Unit Price':                'Price',
+  'Warehouse':                 'WarehouseCode',
+  'Tax Code':                  'TaxCode',
+}
+
 // ─── Registry ──────────────────────────────────────────────────────────────
 
 const REGISTRY: Record<string, BizObjectConfig> = {
@@ -207,7 +414,21 @@ const REGISTRY: Record<string, BizObjectConfig> = {
     docAutoMap: PO_DOC_AUTO_MAP,
     linesAutoMap: PO_LINES_AUTO_MAP,
   },
-  // Future objects will be added here
+  ar_credit_memo: {
+    fields: { doc: AR_CREDIT_MEMO_DOC_FIELDS, lines: AR_CREDIT_MEMO_LINES_FIELDS },
+    docAutoMap: AR_CREDIT_MEMO_DOC_AUTO_MAP,
+    linesAutoMap: AR_CREDIT_MEMO_LINES_AUTO_MAP,
+  },
+  grpo: {
+    fields: { doc: GRPO_DOC_FIELDS, lines: GRPO_LINES_FIELDS },
+    docAutoMap: GRPO_DOC_AUTO_MAP,
+    linesAutoMap: GRPO_LINES_AUTO_MAP,
+  },
+  return: {
+    fields: { doc: RETURN_DOC_FIELDS, lines: RETURN_LINES_FIELDS },
+    docAutoMap: RETURN_DOC_AUTO_MAP,
+    linesAutoMap: RETURN_LINES_AUTO_MAP,
+  },
 }
 
 export function getBizObjectConfig(bizObjectId: string): BizObjectConfig | null {
