@@ -13,7 +13,7 @@ export interface BizObject {
 export const BIZ_CATEGORIES: { id: BizCategory; label: string; icon: string }[] = [
   { id: 'sales',      label: 'Sales',                  icon: 'TrendingUp' },
   { id: 'purchasing', label: 'Purchasing',              icon: 'ShoppingCart' },
-  { id: 'inventory',  label: 'Inventory',  icon: 'Package' },
+  { id: 'inventory',  label: 'Inventory Transactions',  icon: 'Package' },
 ]
 
 export const BIZ_OBJECTS: BizObject[] = [
