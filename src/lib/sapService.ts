@@ -318,6 +318,77 @@ async function runWithConcurrency<T>(
   return results
 }
 
+// ─── Fetch / Copy document ─────────────────────────────────────────────────
+
+/**
+ * Fetches a full document from SAP Service Layer by DocNum.
+ * Returns { docEntry, docNum, header, lines } or null if not found.
+ */
+export async function fetchDocument(
+  bizObjectId: string,
+  docNum: number,
+  sessionId: string,
+): Promise<{ docEntry: number; docNum: number; header: Record<string, unknown>; lines: Record<string, unknown>[] } | null> {
+  const endpoint = SAP_ENDPOINTS[bizObjectId]
+  if (!endpoint) return null
+  const docEntry = await findDocEntry(endpoint, docNum, sessionId)
+  if (docEntry === null) return null
+  const data = await sapGet<Record<string, unknown>>(`${endpoint}(${docEntry})`, sessionId)
+  if (!data) return null
+  const { DocumentLines, ...rest } = data
+  return {
+    docEntry,
+    docNum,
+    header: rest as Record<string, unknown>,
+    lines: Array.isArray(DocumentLines) ? (DocumentLines as Record<string, unknown>[]) : [],
+  }
+}
+
+export interface SourceDocLines {
+  sourceObjectId: string
+  sourceObjectType: number   // BaseType code
+  sourceDocEntry: number
+  lines: Record<string, unknown>[]
+}
+
+/**
+ * Copies one or more source documents into a new target document.
+ * Each line carries BaseType / BaseEntry / BaseLine pointing back to its
+ * specific source document — this creates the SAP Document Relations chain.
+ *
+ * headerOverrides: any header fields to set on the new document (e.g. CardCode)
+ */
+export async function copyDocument(
+  sources: SourceDocLines[],
+  targetObjectId: string,
+  headerOverrides: Record<string, unknown>,
+  sessionId: string,
+): Promise<{ docNum: number; docEntry: number }> {
+  const targetEndpoint = SAP_ENDPOINTS[targetObjectId]
+  if (!targetEndpoint) throw new Error(`No SAP endpoint for target object "${targetObjectId}"`)
+
+  // Build flat DocumentLines array — each line tagged with its source
+  const DocumentLines: Record<string, unknown>[] = []
+  for (const src of sources) {
+    src.lines.forEach((line, idx) => {
+      DocumentLines.push({
+        ...line,
+        BaseType:  src.sourceObjectType,
+        BaseEntry: src.sourceDocEntry,
+        BaseLine:  idx,
+      })
+    })
+  }
+
+  const result = await sapPost<{ DocEntry?: number; DocNum?: number }>(
+    targetEndpoint,
+    { ...headerOverrides, DocumentLines },
+    sessionId,
+  )
+  if (!result.DocEntry || !result.DocNum) throw new Error('SAP did not return DocEntry/DocNum after copy')
+  return { docNum: result.DocNum, docEntry: result.DocEntry }
+}
+
 // ─── Test import ───────────────────────────────────────────────────────────
 
 /**

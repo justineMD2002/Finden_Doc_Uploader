@@ -5,6 +5,7 @@ import { SapProvider, useSap } from '@/context/SapContext'
 import Login from '@/pages/Login'
 import Logs from '@/pages/Logs'
 import Import from '@/pages/Import'
+import Copy from '@/pages/Copy'
 import CompanySelect from '@/pages/CompanySelect'
 import Layout from '@/components/Layout'
 
@@ -61,6 +62,7 @@ function AppRoutes() {
       />
       <Route path="/logs"       element={<ProtectedRoute><Logs /></ProtectedRoute>} />
       <Route path="/upload-doc" element={<ProtectedRoute><Import /></ProtectedRoute>} />
+      <Route path="/copy"       element={<ProtectedRoute><Copy /></ProtectedRoute>} />
       <Route path="*"           element={<Navigate to={user ? defaultPath : '/login'} replace />} />
     </Routes>
   )

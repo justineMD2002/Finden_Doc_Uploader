@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   TrendingUp, ShoppingCart, Package, ChevronRight, ChevronLeft,
   UploadCloud, FileSpreadsheet, X, CheckCircle2, XCircle, Loader2,
@@ -1253,12 +1254,13 @@ function errorHandlingLabel(mode: ErrorHandlingMode) {
 
 
 function ImportResultPanel({
-  result, onReset, onRunImport, onRetestImport,
+  result, onReset, onRunImport, onRetestImport, onCopyTo,
 }: {
   result: ImportResult
   onReset: () => void
   onRunImport?: () => void
   onRetestImport?: () => void
+  onCopyTo?: () => void
 }) {
   const isTest = result.mode === 'test'
   const ok = result.status === 'success'
@@ -1344,6 +1346,14 @@ function ImportResultPanel({
         >
           <RotateCcw className="w-4 h-4" /> Start New Import
         </button>
+        {!isTest && ok && onCopyTo && (
+          <button
+            onClick={onCopyTo}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-white border border-brand-300 text-brand-700 rounded-xl hover:bg-brand-50 transition-colors"
+          >
+            <GitMerge className="w-4 h-4" /> Copy To
+          </button>
+        )}
       </div>
     </div>
   )
@@ -1351,7 +1361,7 @@ function ImportResultPanel({
 
 function StepImport({
   bizObject, docFile, linesFile, mappings, errorHandling,
-  copyFrom, result, onResult, onClearResult, onBack, onReset,
+  copyFrom, result, onResult, onClearResult, onBack, onReset, onCopyTo,
 }: {
   bizObject: BizObject
   docFile: UploadedFile
@@ -1364,6 +1374,7 @@ function StepImport({
   onClearResult: () => void
   onBack: () => void
   onReset: () => void
+  onCopyTo?: () => void
 }) {
   const [running,  setRunning]  = useState<'test' | 'import' | null>(null)
   const [progress, setProgress] = useState<ImportProgress | null>(null)
@@ -1538,6 +1549,7 @@ function StepImport({
           onReset={onReset}
           onRunImport={result.mode === 'test' ? () => { onClearResult(); run('import') } : undefined}
           onRetestImport={result.mode === 'test' ? () => { onClearResult(); run('test') } : undefined}
+          onCopyTo={onCopyTo}
         />
       )}
 
@@ -1560,6 +1572,7 @@ function StepImport({
 
 export default function Import() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const [step, setStep] = useState<WizardStep>(1)
   const [bizObject, setBizObject] = useState<BizObject | null>(null)
@@ -1779,6 +1792,11 @@ export default function Import() {
             onClearResult={() => setResult(null)}
             onBack={() => setStep(4)}
             onReset={handleReset}
+            onCopyTo={
+              result && result.mode === 'import' && result.status === 'success' && result.sapReference
+                ? () => navigate('/copy', { state: { sourceObjectId: bizObject.id, docNum: result!.sapReference } })
+                : undefined
+            }
           />
         )}
       </div>

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   ClipboardList, LogOut, UploadCloud,
-  User, ChevronDown, X, Save, Loader2, Database, RefreshCw, KeyRound, Eye, EyeOff,
+  User, ChevronDown, X, Save, Loader2, Database, RefreshCw, KeyRound, Eye, EyeOff, GitMerge,
 } from 'lucide-react'
 import findenLogo from '@/assets/finden_logo.png'
 import { useAuth } from '@/context/AuthContext'
@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 
 const navItems = [
   { to: '/upload-doc', label: 'Data Import', icon: UploadCloud },
+  { to: '/copy', label: 'Copy Document', icon: GitMerge },
   { to: '/logs', label: 'Import Logs', icon: ClipboardList },
 ]
 
@@ -346,7 +347,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150',
+                    'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150 whitespace-nowrap',
                     isActive
                       ? 'bg-brand-50 text-brand-700'
                       : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
