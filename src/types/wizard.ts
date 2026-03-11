@@ -62,6 +62,15 @@ export interface ImportResult {
   timestamp: string
 }
 
+// ─── Copy From state ──────────────────────────────────────────────────────
+
+export interface CopyFromState {
+  sourceObjectId: string    // e.g. 'po'
+  sourceObjectType: number  // SAP BaseType code, e.g. 22
+  sourceDocNum: number      // DocNum the user entered
+  sourceDocEntry: number    // resolved DocEntry from SAP
+}
+
 // ─── Wizard state ─────────────────────────────────────────────────────────
 
 export type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -84,6 +93,7 @@ export interface CellValidationError {
 export interface WizardState {
   step: WizardStep
   bizObject: BizObject | null
+  copyFrom: CopyFromState | null    // optional copy-from source
   docFile: UploadedFile | null      // "Document" tab
   linesFile: UploadedFile | null    // "Document Lines" tab
   mappings: MappingRow[]

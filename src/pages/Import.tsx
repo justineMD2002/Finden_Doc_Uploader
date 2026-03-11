@@ -3,7 +3,7 @@ import {
   TrendingUp, ShoppingCart, Package, ChevronRight, ChevronLeft,
   UploadCloud, FileSpreadsheet, X, CheckCircle2, XCircle, Loader2,
   ArrowRight, AlertTriangle, FlaskConical, Send, RotateCcw, Check,
-  AlertCircle, Info, Wand2, Download,
+  AlertCircle, Info, Wand2, Download, GitMerge,
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import {
   type BizCategory, type BizObject,
   type MappingRow, type ErrorHandlingMode,
   type UploadedFile, type WizardStep, type ImportResult,
+  type CopyFromState,
 } from '@/types/wizard'
 import {
   getBizObjectConfig, applyAutoMap, reAutoMap, validateMappedRows,
@@ -26,7 +27,8 @@ import {
 import { insertImportLog } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useSap } from '@/context/SapContext'
-import { runSapTest, runSapImport, type ImportProgress } from '@/lib/sapService'
+import { runSapTest, runSapImport, lookupSourceDoc, type ImportProgress } from '@/lib/sapService'
+import { getCopyFromSources, getBizObjectLabel } from '@/lib/copyRelations'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -105,14 +107,159 @@ function WizardProgress({ step }: { step: WizardStep }) {
   )
 }
 
+// ─── Copy From Panel ───────────────────────────────────────────────────────
+
+function CopyFromPanel({
+  targetId,
+  copyFrom,
+  onChange,
+}: {
+  targetId: string
+  copyFrom: CopyFromState | null
+  onChange: (state: CopyFromState | null) => void
+}) {
+  const sources = getCopyFromSources(targetId)
+  const { session } = useSap()
+  const [open, setOpen] = useState(false)
+  const [sourceId, setSourceId] = useState(sources[0] ?? '')
+  const [docNumInput, setDocNumInput] = useState('')
+  const [looking, setLooking] = useState(false)
+  const [notFound, setNotFound] = useState(false)
+
+  if (sources.length === 0) return null
+
+  async function handleLookup() {
+    const n = parseInt(docNumInput, 10)
+    if (isNaN(n) || n <= 0) return
+    if (!session) return
+    setLooking(true)
+    setNotFound(false)
+    try {
+      const result = await lookupSourceDoc(sourceId, n, session.sessionId)
+      if (!result) {
+        setNotFound(true)
+        onChange(null)
+      } else {
+        const { BASE_TYPE_CODES } = await import('@/lib/copyRelations')
+        onChange({
+          sourceObjectId: sourceId,
+          sourceObjectType: BASE_TYPE_CODES[sourceId] ?? 0,
+          sourceDocNum: result.docNum,
+          sourceDocEntry: result.docEntry,
+        })
+      }
+    } finally {
+      setLooking(false)
+    }
+  }
+
+  function handleClear() {
+    onChange(null)
+    setDocNumInput('')
+    setNotFound(false)
+  }
+
+  return (
+    <div className="border border-dashed border-brand-300 rounded-xl bg-brand-50/30 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-50/50 transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <GitMerge className="w-4 h-4" />
+          Copy From
+          <span className="text-xs font-normal text-brand-500">(optional)</span>
+          {copyFrom && (
+            <span className="ml-1 text-xs bg-brand-600 text-white rounded-full px-2 py-0.5">
+              {getBizObjectLabel(copyFrom.sourceObjectId)} #{copyFrom.sourceDocNum}
+            </span>
+          )}
+        </span>
+        <ChevronRight className={cn('w-4 h-4 transition-transform', open && 'rotate-90')} />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-brand-200/60 pt-3">
+          <p className="text-xs text-gray-500">
+            Link this document to an existing source document in SAP. Each line in your upload
+            file will be automatically linked to the corresponding line in the source document.
+          </p>
+
+          {sources.length > 1 && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-600">Copy from</label>
+              <select
+                value={sourceId}
+                onChange={e => { setSourceId(e.target.value); onChange(null); setNotFound(false) }}
+                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {sources.map(s => (
+                  <option key={s} value={s}>{getBizObjectLabel(s)}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {sources.length === 1 && (
+            <p className="text-xs text-gray-600">
+              Source: <span className="font-medium text-gray-800">{getBizObjectLabel(sources[0])}</span>
+            </p>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min={1}
+              value={docNumInput}
+              onChange={e => { setDocNumInput(e.target.value); onChange(null); setNotFound(false) }}
+              onKeyDown={e => e.key === 'Enter' && handleLookup()}
+              placeholder={`${getBizObjectLabel(sourceId)} #`}
+              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <button
+              type="button"
+              onClick={handleLookup}
+              disabled={looking || !docNumInput || !session}
+              title={!session ? 'Connect to SAP first' : undefined}
+              className="px-4 py-2 text-sm font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {looking ? 'Looking up…' : 'Look up'}
+            </button>
+          </div>
+
+          {copyFrom && (
+            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <span className="text-xs text-green-700 font-medium">
+                ✓ {getBizObjectLabel(copyFrom.sourceObjectId)} #{copyFrom.sourceDocNum} — DocEntry {copyFrom.sourceDocEntry}
+              </span>
+              <button type="button" onClick={handleClear} className="text-xs text-gray-400 hover:text-gray-600 ml-2">
+                Clear
+              </button>
+            </div>
+          )}
+          {notFound && (
+            <p className="text-xs text-red-600">Document not found in SAP. Check the number and try again.</p>
+          )}
+          {!session && (
+            <p className="text-xs text-amber-600">Connect to SAP first to look up documents.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Step 1 — Business Object ──────────────────────────────────────────────
 
 function StepBusinessObject({
-  selected, onSelect, onNext,
+  selected, onSelect, onNext, copyFrom, onCopyFromChange,
 }: {
   selected: BizObject | null
   onSelect: (o: BizObject) => void
   onNext: () => void
+  copyFrom: CopyFromState | null
+  onCopyFromChange: (state: CopyFromState | null) => void
 }) {
   return (
     <div className="space-y-6">
@@ -179,6 +326,14 @@ function StepBusinessObject({
           )
         })}
       </div>
+
+      {selected && (
+        <CopyFromPanel
+          targetId={selected.id}
+          copyFrom={copyFrom}
+          onChange={onCopyFromChange}
+        />
+      )}
 
       <div className="flex justify-end pt-2">
         <button
@@ -1096,39 +1251,6 @@ function errorHandlingLabel(mode: ErrorHandlingMode) {
   return ERROR_HANDLING_OPTIONS.find(o => o.value === mode)?.label ?? mode
 }
 
-async function mockRunImport(
-  mode: 'test' | 'import',
-  docFile: UploadedFile,
-  errorHandling: ErrorHandlingMode,
-): Promise<ImportResult> {
-  await new Promise(r => setTimeout(r, 1800))
-  const total = docFile.rowCount
-  const failedCount = Math.floor(total * 0.05)
-  const successCount = total - failedCount
-
-  let status: ImportResult['status'] = 'success'
-  if (failedCount > 0 && errorHandling === 'cancel_rollback') status = 'failed'
-  else if (failedCount > 0) status = 'partial'
-
-  const errors = Array.from({ length: Math.min(failedCount, 5) }, (_, i) => ({
-    row: i * 3 + 2,
-    field: docFile.columns[i % docFile.columns.length] ?? 'Unknown',
-    message: 'Value does not match SAP field format',
-  }))
-
-  return {
-    mode,
-    status: mode === 'test' ? (failedCount === 0 ? 'success' : 'partial') : status,
-    totalRecords: total,
-    successCount: mode === 'test' ? successCount : (status === 'failed' ? 0 : successCount),
-    failedCount: mode === 'test' ? failedCount : (status === 'failed' ? total : failedCount),
-    errors,
-    sapReference: mode === 'import' && status !== 'failed'
-      ? `SAP-${Date.now().toString(36).toUpperCase()}`
-      : undefined,
-    timestamp: new Date().toISOString(),
-  }
-}
 
 function ImportResultPanel({
   result, onReset, onRunImport, onRetestImport,
@@ -1229,13 +1351,14 @@ function ImportResultPanel({
 
 function StepImport({
   bizObject, docFile, linesFile, mappings, errorHandling,
-  result, onResult, onClearResult, onBack, onReset,
+  copyFrom, result, onResult, onClearResult, onBack, onReset,
 }: {
   bizObject: BizObject
   docFile: UploadedFile
   linesFile: UploadedFile
   mappings: MappingRow[]
   errorHandling: ErrorHandlingMode
+  copyFrom: CopyFromState | null
   result: ImportResult | null
   onResult: (r: ImportResult) => void
   onClearResult: () => void
@@ -1257,8 +1380,8 @@ function StepImport({
     setProgress(null)
     try {
       const r = mode === 'test'
-        ? await runSapTest(bizObject.id, docFile, linesFile, mappings, session.sessionId, setProgress)
-        : await runSapImport(bizObject.id, docFile, linesFile, mappings, session.sessionId, errorHandling, setProgress)
+        ? await runSapTest(bizObject.id, docFile, linesFile, mappings, session.sessionId, setProgress, copyFrom)
+        : await runSapImport(bizObject.id, docFile, linesFile, mappings, session.sessionId, errorHandling, setProgress, copyFrom)
       onResult(r)
       if (mode === 'import') {
         if (r.status === 'success') toast.success('Import completed successfully!', { description: `SAP Ref: ${r.sapReference}` })
@@ -1440,6 +1563,7 @@ export default function Import() {
 
   const [step, setStep] = useState<WizardStep>(1)
   const [bizObject, setBizObject] = useState<BizObject | null>(null)
+  const [copyFrom, setCopyFrom] = useState<CopyFromState | null>(null)
   const [docFile, setDocFile] = useState<UploadedFile | null>(null)
   const [linesFile, setLinesFile] = useState<UploadedFile | null>(null)
   const [mappings, setMappings] = useState<MappingRow[]>([])
@@ -1455,6 +1579,7 @@ export default function Import() {
 
     setStep(draft.step)
     setBizObject(draft.bizObject)
+    setCopyFrom(draft.copyFrom ?? null)
     setMappings(draft.mappings)
     setErrorHandling(draft.errorHandling)
 
@@ -1475,12 +1600,13 @@ export default function Import() {
     saveWizardDraft({
       step,
       bizObject,
+      copyFrom,
       docFileData: docFile ? uploadedFileToStored(docFile) : null,
       linesFileData: linesFile ? uploadedFileToStored(linesFile) : null,
       mappings,
       errorHandling,
     })
-  }, [step, bizObject, docFile, linesFile, mappings, errorHandling])
+  }, [step, bizObject, copyFrom, docFile, linesFile, mappings, errorHandling])
 
   function buildMappings(docCols: string[], linesCols: string[], bizObj: BizObject | null) {
     const config = bizObj ? getBizObjectConfig(bizObj.id) : null
@@ -1508,6 +1634,7 @@ export default function Import() {
 
   function handleSelectBizObject(o: BizObject) {
     setBizObject(o)
+    setCopyFrom(null)
     setDocFile(null)
     setLinesFile(null)
     setMappings([])
@@ -1531,6 +1658,7 @@ export default function Import() {
     clearWizardDraft()
     setStep(1)
     setBizObject(null)
+    setCopyFrom(null)
     setDocFile(null)
     setLinesFile(null)
     setMappings([])
@@ -1598,7 +1726,13 @@ export default function Import() {
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sm:p-8">
         {step === 1 && (
-          <StepBusinessObject selected={bizObject} onSelect={handleSelectBizObject} onNext={() => setStep(2)} />
+          <StepBusinessObject
+            selected={bizObject}
+            onSelect={handleSelectBizObject}
+            onNext={() => setStep(2)}
+            copyFrom={copyFrom}
+            onCopyFromChange={setCopyFrom}
+          />
         )}
         {step === 2 && bizObject && (
           <StepUploadFiles
@@ -1639,6 +1773,7 @@ export default function Import() {
             linesFile={linesFile}
             mappings={mappings}
             errorHandling={errorHandling}
+            copyFrom={copyFrom}
             result={result}
             onResult={handleImportComplete}
             onClearResult={() => setResult(null)}

@@ -7,7 +7,7 @@
  */
 
 import type {
-  BizObject, MappingRow, ErrorHandlingMode, WizardStep,
+  BizObject, MappingRow, ErrorHandlingMode, WizardStep, CopyFromState,
 } from '@/types/wizard'
 
 const DRAFT_KEY = 'finden_wizard_draft'
@@ -26,6 +26,7 @@ interface StoredFile {
 export interface WizardDraft {
   step: WizardStep
   bizObject: BizObject | null
+  copyFrom: CopyFromState | null
   docFileData: StoredFile | null
   linesFileData: StoredFile | null
   mappings: MappingRow[]

@@ -4,7 +4,7 @@
  * The proxy runs in Node.js with secure:false so it can reach self-signed certs.
  */
 
-import type { UploadedFile, MappingRow, ImportResult } from '@/types/wizard'
+import type { UploadedFile, MappingRow, ImportResult, CopyFromState } from '@/types/wizard'
 import type { ErrorHandlingMode } from '@/types/wizard'
 
 const BASE = '/b1s/v1'
@@ -163,6 +163,22 @@ async function findDocEntry(
   return null
 }
 
+/**
+ * Look up a source document by DocNum for Copy From.
+ * Returns { docEntry, docNum } if found, null if not found.
+ */
+export async function lookupSourceDoc(
+  sourceObjectId: string,
+  docNum: number,
+  sessionId: string,
+): Promise<{ docEntry: number; docNum: number } | null> {
+  const endpoint = SAP_ENDPOINTS[sourceObjectId]
+  if (!endpoint) return null
+  const docEntry = await findDocEntry(endpoint, docNum, sessionId)
+  if (docEntry === null) return null
+  return { docEntry, docNum }
+}
+
 // ─── Payload builder ───────────────────────────────────────────────────────
 
 /** Convert a raw cell value to the format SAP Service Layer expects. */
@@ -199,6 +215,7 @@ function buildPayload(
   docRow: Record<string, unknown>,
   lineRows: Record<string, unknown>[],
   mappings: MappingRow[],
+  copyFrom?: CopyFromState | null,
 ): { payload: Record<string, unknown>; docNum: number | null } {
   const docMappings   = mappings.filter(m => m.tab === 'doc'   && m.targetField.trim())
   const linesMappings = mappings.filter(m => m.tab === 'lines' && m.targetField.trim())
@@ -224,12 +241,17 @@ function buildPayload(
     header[m.targetField] = v
   }
 
-  const DocumentLines = lineRows.map(lineRow => {
+  const DocumentLines = lineRows.map((lineRow, lineIndex) => {
     const line: Record<string, unknown> = {}
     for (const m of linesMappings) {
       if (m.targetField === 'ParentKey' || m.targetField === 'LineNum') continue
       const v = toSapValue(lineRow[m.sourceField], m.targetField)
       if (v !== undefined) line[m.targetField] = v
+    }
+    if (copyFrom) {
+      line['BaseType']  = copyFrom.sourceObjectType
+      line['BaseEntry'] = copyFrom.sourceDocEntry
+      line['BaseLine']  = lineIndex
     }
     return line
   })
@@ -309,6 +331,7 @@ export async function runSapTest(
   mappings: MappingRow[],
   sessionId: string,
   onProgress: ProgressCallback,
+  copyFrom?: CopyFromState | null,
 ): Promise<ImportResult> {
   const endpoint = SAP_ENDPOINTS[bizObjectId]
   const errors: ImportResult['errors'] = []
@@ -334,7 +357,7 @@ export async function runSapTest(
 
   for (let i = 0; i < groups.length; i++) {
     const { docRow, lineRows } = groups[i]
-    const { payload } = buildPayload(docRow, lineRows, mappings)
+    const { payload } = buildPayload(docRow, lineRows, mappings, copyFrom)
 
     onProgress({
       current: i + 1, total,
@@ -345,7 +368,7 @@ export async function runSapTest(
     })
 
     // ── Required field checks ──────────────────────────────────────────────
-    if (!payload['CardCode']) {
+    if (!payload['CardCode'] && !copyFrom) {
       errors.push({ row: i + 1, field: 'CardCode', message: 'CardCode is required' })
       continue
     }
@@ -423,6 +446,7 @@ export async function runSapImport(
   sessionId: string,
   errorHandling: ErrorHandlingMode,
   onProgress: ProgressCallback,
+  copyFrom?: CopyFromState | null,
 ): Promise<ImportResult> {
   const endpoint = SAP_ENDPOINTS[bizObjectId]
 
@@ -440,7 +464,7 @@ export async function runSapImport(
 
   // ── cancel_rollback: sequential so we can stop + rollback immediately ─────
   if (errorHandling === 'cancel_rollback') {
-    return runSapImportSequential(endpoint, groups, mappings, sessionId, total, onProgress)
+    return runSapImportSequential(endpoint, groups, mappings, sessionId, total, onProgress, copyFrom)
   }
 
   // ── ignore_all / ignore_up_to_10: parallel with concurrency limit ─────────
@@ -457,7 +481,7 @@ export async function runSapImport(
   const tasks = groups.map(({ docRow, lineRows }, i) => async () => {
     if (stopped) return
 
-    const { payload, docNum } = buildPayload(docRow, lineRows, mappings)
+    const { payload, docNum } = buildPayload(docRow, lineRows, mappings, copyFrom)
 
     try {
       let resultDocNum: string | undefined
@@ -529,6 +553,7 @@ async function runSapImportSequential(
   sessionId: string,
   total: number,
   onProgress: ProgressCallback,
+  copyFrom?: CopyFromState | null,
 ): Promise<ImportResult> {
   const errors: ImportResult['errors'] = []
   const createdDocEntries: number[] = []
@@ -537,7 +562,7 @@ async function runSapImportSequential(
 
   for (let i = 0; i < groups.length; i++) {
     const { docRow, lineRows } = groups[i]
-    const { payload, docNum } = buildPayload(docRow, lineRows, mappings)
+    const { payload, docNum } = buildPayload(docRow, lineRows, mappings, copyFrom)
 
     onProgress({
       current: i + 1, total,
