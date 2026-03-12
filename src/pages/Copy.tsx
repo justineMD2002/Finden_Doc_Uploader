@@ -13,13 +13,13 @@ import { getBizObjectLabel, COPY_FROM_EDGES, BASE_TYPE_CODES } from '@/lib/copyR
 import { useSap } from '@/context/SapContext'
 import { fetchDocument, copyDocument, type SourceDocLines } from '@/lib/sapService'
 
-function categoryIcon(cat: BizCategory) {
+const categoryIcon = (cat: BizCategory) => {
   if (cat === 'sales')      return <TrendingUp className="w-4 h-4" />
   if (cat === 'purchasing') return <ShoppingCart className="w-4 h-4" />
   return <Package className="w-4 h-4" />
 }
 
-function getValidSourceIds(): string[] {
+const getValidSourceIds = (): string[] => {
   const sources = new Set<string>()
   for (const srcs of Object.values(COPY_FROM_EDGES)) {
     for (const s of srcs) sources.add(s)
@@ -27,7 +27,7 @@ function getValidSourceIds(): string[] {
   return [...sources]
 }
 
-function getCopyToTargets(sourceId: string): string[] {
+const getCopyToTargets = (sourceId: string): string[] => {
   return Object.entries(COPY_FROM_EDGES)
     .filter(([, srcs]) => srcs.includes(sourceId))
     .map(([target]) => target)
@@ -50,14 +50,14 @@ interface CopyResult {
   targetLabel: string
 }
 
-function SourceDocRow({
+const SourceDocRow = ({
   sourceObjectId, doc, onRemove, onToggle,
 }: {
   sourceObjectId: string
   doc: FetchedDoc
   onRemove: () => void
   onToggle: () => void
-}) {
+}) => {
   const config = getBizObjectConfig(sourceObjectId)
   const lineColumns = config
     ? config.fields.lines.map(f => f.field).filter(f => doc.lines.some(l => l[f] !== undefined))
@@ -112,7 +112,7 @@ function SourceDocRow({
   )
 }
 
-export default function Copy() {
+const Copy = () => {
   const { session } = useSap()
   const location = useLocation()
   const locationState = location.state as { sourceObjectId?: string; docNum?: string | number } | null
@@ -137,7 +137,7 @@ export default function Copy() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function fetchAndAdd(srcId: string, num: number) {
+  const fetchAndAdd = async (srcId: string, num: number) => {
     if (!session) return
     if (sourceDocs.some(d => d.docNum === num)) {
       toast.warning(`${getBizObjectLabel(srcId)} #${num} is already added.`)
@@ -159,13 +159,13 @@ export default function Copy() {
     }
   }
 
-  function handleAddDoc() {
+  const handleAddDoc = () => {
     const n = parseInt(docNumInput, 10)
     if (!sourceObjectId || isNaN(n) || n <= 0 || !session) return
     fetchAndAdd(sourceObjectId, n)
   }
 
-  function handleSelectSource(id: string) {
+  const handleSelectSource = (id: string) => {
     if (id !== sourceObjectId) {
       setSourceObjectId(id)
       setSourceDocs([])
@@ -175,15 +175,15 @@ export default function Copy() {
     }
   }
 
-  function handleRemoveDoc(docNum: number) {
+  const handleRemoveDoc = (docNum: number) => {
     setSourceDocs(prev => prev.filter(d => d.docNum !== docNum))
   }
 
-  function toggleExpanded(docNum: number) {
+  const toggleExpanded = (docNum: number) => {
     setSourceDocs(prev => prev.map(d => d.docNum === docNum ? { ...d, expanded: !d.expanded } : d))
   }
 
-  async function handleCopy() {
+  const handleCopy = async () => {
     if (!sourceObjectId || sourceDocs.length === 0 || !targetObjectId || !session) return
 
     // Each source doc carries its own BaseEntry — this is what creates the SAP relation chain
@@ -225,7 +225,7 @@ export default function Copy() {
     }
   }
 
-  function handleReset() {
+  const handleReset = () => {
     setSourceObjectId(null)
     setSourceDocs([])
     setDocNumInput('')
@@ -483,3 +483,5 @@ export default function Copy() {
     </div>
   )
 }
+
+export default Copy

@@ -31,11 +31,11 @@ export const COPY_FROM_EDGES: Record<string, string[]> = {
 }
 
 /** Returns the valid source biz object ids that can be copied into the given target. */
-export function getCopyFromSources(targetId: string): string[] {
+export const getCopyFromSources = (targetId: string): string[] => {
   return COPY_FROM_EDGES[targetId] ?? []
 }
 
 /** Returns the human-readable label for a biz object id. */
-export function getBizObjectLabel(id: string): string {
+export const getBizObjectLabel = (id: string): string => {
   return BIZ_OBJECTS.find(b => b.id === id)?.label ?? id
 }

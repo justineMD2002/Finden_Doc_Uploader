@@ -22,7 +22,7 @@ const COLUMNS = [
   { name: 'remarks', type: 'String', required: false, example: 'Urgent delivery', desc: 'Optional notes' },
 ]
 
-export default function FormatGuide() {
+const FormatGuide = () => {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -122,3 +122,5 @@ export default function FormatGuide() {
     </div>
   )
 }
+
+export default FormatGuide

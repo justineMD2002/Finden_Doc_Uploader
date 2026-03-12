@@ -36,7 +36,7 @@ export interface WizardDraft {
 
 // ─── Save ──────────────────────────────────────────────────────────────────
 
-export function saveWizardDraft(draft: Omit<WizardDraft, 'savedAt'>): void {
+export const saveWizardDraft = (draft: Omit<WizardDraft, 'savedAt'>): void => {
   const payload: WizardDraft = { ...draft, savedAt: new Date().toISOString() }
   try {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(payload))
@@ -47,7 +47,7 @@ export function saveWizardDraft(draft: Omit<WizardDraft, 'savedAt'>): void {
 
 // ─── Load ──────────────────────────────────────────────────────────────────
 
-export function loadWizardDraft(): WizardDraft | null {
+export const loadWizardDraft = (): WizardDraft | null => {
   try {
     const raw = localStorage.getItem(DRAFT_KEY)
     if (!raw) return null
@@ -59,7 +59,7 @@ export function loadWizardDraft(): WizardDraft | null {
 
 // ─── Clear ─────────────────────────────────────────────────────────────────
 
-export function clearWizardDraft(): void {
+export const clearWizardDraft = (): void => {
   localStorage.removeItem(DRAFT_KEY)
 }
 
@@ -69,7 +69,7 @@ export function clearWizardDraft(): void {
  * Reconstruct an UploadedFile from stored data.
  * The `file` property will be an empty placeholder File so `.name` works.
  */
-export function storedFileToUploaded(stored: StoredFile) {
+export const storedFileToUploaded = (stored: StoredFile) => {
   return {
     file: new File([], stored.fileName),
     columns: stored.columns,
@@ -80,12 +80,12 @@ export function storedFileToUploaded(stored: StoredFile) {
 
 // ─── Helper: UploadedFile → StoredFile ─────────────────────────────────────
 
-export function uploadedFileToStored(uploaded: {
+export const uploadedFileToStored = (uploaded: {
   file: File
   columns: string[]
   rowCount: number
   rows: Record<string, unknown>[]
-}): StoredFile {
+}): StoredFile => {
   return {
     fileName: uploaded.file.name,
     columns: uploaded.columns,

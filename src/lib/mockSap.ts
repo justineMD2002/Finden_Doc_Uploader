@@ -3,7 +3,7 @@ import { generateId } from '@/lib/utils'
 
 const LOGS_KEY = 'pixelcare_upload_logs'
 
-export function getLogs(): UploadLog[] {
+export const getLogs = (): UploadLog[] => {
   const raw = localStorage.getItem(LOGS_KEY)
   if (!raw) return []
   try {
@@ -13,11 +13,11 @@ export function getLogs(): UploadLog[] {
   }
 }
 
-function saveLogs(logs: UploadLog[]) {
+const saveLogs = (logs: UploadLog[]) => {
   localStorage.setItem(LOGS_KEY, JSON.stringify(logs))
 }
 
-export async function submitToSAP(
+export const submitToSAP = async (
   rows: Record<string, unknown>[],
   errors: ValidationError[],
   filename: string,
@@ -25,7 +25,7 @@ export async function submitToSAP(
   databaseId?: string,
   databaseName?: string,
   module?: string,
-): Promise<UploadLog> {
+): Promise<UploadLog> => {
   // Simulate network delay
   await new Promise(res => setTimeout(res, 1800))
 

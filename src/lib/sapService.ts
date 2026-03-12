@@ -35,14 +35,12 @@ const SAP_ENDPOINTS: Record<string, string> = {
 
 // ─── HTTP helpers ──────────────────────────────────────────────────────────
 
-function authHeaders(sessionId: string): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    'Cookie': `B1SESSION=${sessionId}`,
-  }
-}
+const authHeaders = (sessionId: string): HeadersInit => ({
+  'Content-Type': 'application/json',
+  'Cookie': `B1SESSION=${sessionId}`,
+})
 
-async function parseError(res: Response): Promise<string> {
+const parseError = async (res: Response): Promise<string> => {
   try {
     const body = await res.json()
     return body?.error?.message?.value ?? `SAP error (HTTP ${res.status})`
@@ -51,7 +49,7 @@ async function parseError(res: Response): Promise<string> {
   }
 }
 
-async function sapGet<T = unknown>(endpoint: string, sessionId: string): Promise<T | null> {
+const sapGet = async <T = unknown>(endpoint: string, sessionId: string): Promise<T | null> => {
   const res = await fetch(`${BASE}/${endpoint}`, {
     method: 'GET',
     headers: authHeaders(sessionId),
@@ -62,7 +60,7 @@ async function sapGet<T = unknown>(endpoint: string, sessionId: string): Promise
   return res.json() as Promise<T>
 }
 
-async function sapPost<T = unknown>(endpoint: string, body: unknown, sessionId: string): Promise<T> {
+const sapPost = async <T = unknown>(endpoint: string, body: unknown, sessionId: string): Promise<T> => {
   const res = await fetch(`${BASE}/${endpoint}`, {
     method: 'POST',
     headers: authHeaders(sessionId),
@@ -73,7 +71,7 @@ async function sapPost<T = unknown>(endpoint: string, body: unknown, sessionId: 
   return res.json() as Promise<T>
 }
 
-async function sapPatch(endpoint: string, docEntry: number, body: unknown, sessionId: string): Promise<void> {
+const sapPatch = async (endpoint: string, docEntry: number, body: unknown, sessionId: string): Promise<void> => {
   const res = await fetch(`${BASE}/${endpoint}(${docEntry})`, {
     method: 'PATCH',
     headers: authHeaders(sessionId),
@@ -85,7 +83,7 @@ async function sapPatch(endpoint: string, docEntry: number, body: unknown, sessi
 }
 
 /** Best-effort cancel — used during rollback. Never throws. */
-async function sapCancel(endpoint: string, docEntry: number, sessionId: string): Promise<void> {
+const sapCancel = async (endpoint: string, docEntry: number, sessionId: string): Promise<void> => {
   try {
     const res = await fetch(`${BASE}/${endpoint}(${docEntry})/Cancel`, {
       method: 'POST',
@@ -100,7 +98,7 @@ async function sapCancel(endpoint: string, docEntry: number, sessionId: string):
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
 
-export async function sapLogin(companyDB: string): Promise<SapSession> {
+export const sapLogin = async (companyDB: string): Promise<SapSession> => {
   const res = await fetch(`${BASE}/Login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -123,7 +121,7 @@ export async function sapLogin(companyDB: string): Promise<SapSession> {
   return session
 }
 
-export async function sapLogout(sessionId: string): Promise<void> {
+export const sapLogout = async (sessionId: string): Promise<void> => {
   await fetch(`${BASE}/Logout`, {
     method: 'POST',
     headers: authHeaders(sessionId),
@@ -133,7 +131,7 @@ export async function sapLogout(sessionId: string): Promise<void> {
 
 // ─── Master-data lookups (used in test import) ────────────────────────────
 
-async function cardCodeExists(cardCode: string, sessionId: string): Promise<boolean> {
+const cardCodeExists = async (cardCode: string, sessionId: string): Promise<boolean> => {
   const data = await sapGet<{ CardCode: string }>(
     `BusinessPartners('${encodeURIComponent(cardCode)}')?$select=CardCode`,
     sessionId,
@@ -141,7 +139,7 @@ async function cardCodeExists(cardCode: string, sessionId: string): Promise<bool
   return data !== null
 }
 
-async function itemCodeExists(itemCode: string, sessionId: string): Promise<boolean> {
+const itemCodeExists = async (itemCode: string, sessionId: string): Promise<boolean> => {
   const data = await sapGet<{ ItemCode: string }>(
     `Items('${encodeURIComponent(itemCode)}')?$select=ItemCode`,
     sessionId,
@@ -150,11 +148,11 @@ async function itemCodeExists(itemCode: string, sessionId: string): Promise<bool
 }
 
 /** Returns DocEntry if the document exists in SAP, otherwise null. */
-async function findDocEntry(
+const findDocEntry = async (
   endpoint: string,
   docNum: number,
   sessionId: string,
-): Promise<number | null> {
+): Promise<number | null> => {
   const data = await sapGet<{ value: Array<{ DocEntry: number }> }>(
     `${endpoint}?$filter=DocNum%20eq%20${docNum}&$select=DocEntry,DocNum&$top=1`,
     sessionId,
@@ -167,11 +165,11 @@ async function findDocEntry(
  * Look up a source document by DocNum for Copy From.
  * Returns { docEntry, docNum } if found, null if not found.
  */
-export async function lookupSourceDoc(
+export const lookupSourceDoc = async (
   sourceObjectId: string,
   docNum: number,
   sessionId: string,
-): Promise<{ docEntry: number; docNum: number } | null> {
+): Promise<{ docEntry: number; docNum: number } | null> => {
   const endpoint = SAP_ENDPOINTS[sourceObjectId]
   if (!endpoint) return null
   const docEntry = await findDocEntry(endpoint, docNum, sessionId)
@@ -182,7 +180,7 @@ export async function lookupSourceDoc(
 // ─── Payload builder ───────────────────────────────────────────────────────
 
 /** Convert a raw cell value to the format SAP Service Layer expects. */
-function toSapValue(value: unknown, fieldName: string): unknown {
+const toSapValue = (value: unknown, fieldName: string): unknown => {
   if (value === null || value === undefined || value === '') return undefined
 
   if (value instanceof Date) {
@@ -211,12 +209,12 @@ function toSapValue(value: unknown, fieldName: string): unknown {
  * (SAP will treat this as a Handwritten/manual document).
  * If DocNum is empty/unmapped, it is omitted and SAP auto-assigns it.
  */
-function buildPayload(
+const buildPayload = (
   docRow: Record<string, unknown>,
   lineRows: Record<string, unknown>[],
   mappings: MappingRow[],
   copyFrom?: CopyFromState | null,
-): { payload: Record<string, unknown>; docNum: number | null } {
+): { payload: Record<string, unknown>; docNum: number | null } => {
   const docMappings   = mappings.filter(m => m.tab === 'doc'   && m.targetField.trim())
   const linesMappings = mappings.filter(m => m.tab === 'lines' && m.targetField.trim())
 
@@ -260,11 +258,11 @@ function buildPayload(
 }
 
 /** Group doc rows with their matching line rows by DocNum → ParentKey. */
-function groupDocuments(
+const groupDocuments = (
   docRows: Record<string, unknown>[],
   linesRows: Record<string, unknown>[],
   mappings: MappingRow[],
-): Array<{ docRow: Record<string, unknown>; lineRows: Record<string, unknown>[] }> {
+): Array<{ docRow: Record<string, unknown>; lineRows: Record<string, unknown>[] }> => {
   const docNumSrc    = mappings.find(m => m.tab === 'doc'   && m.targetField === 'DocNum')?.sourceField
   const parentKeySrc = mappings.find(m => m.tab === 'lines' && m.targetField === 'ParentKey')?.sourceField
 
@@ -296,14 +294,14 @@ export type ProgressCallback = (p: ImportProgress) => void
  * Runs `tasks` with at most `limit` running concurrently.
  * Results are returned in the same order as the input tasks.
  */
-async function runWithConcurrency<T>(
+const runWithConcurrency = async <T>(
   tasks: (() => Promise<T>)[],
   limit: number,
-): Promise<PromiseSettledResult<T>[]> {
+): Promise<PromiseSettledResult<T>[]> => {
   const results: PromiseSettledResult<T>[] = new Array(tasks.length)
   let nextIndex = 0
 
-  async function worker() {
+  const worker = async () => {
     while (nextIndex < tasks.length) {
       const i = nextIndex++
       try {
@@ -324,11 +322,11 @@ async function runWithConcurrency<T>(
  * Fetches a full document from SAP Service Layer by DocNum.
  * Returns { docEntry, docNum, header, lines } or null if not found.
  */
-export async function fetchDocument(
+export const fetchDocument = async (
   bizObjectId: string,
   docNum: number,
   sessionId: string,
-): Promise<{ docEntry: number; docNum: number; header: Record<string, unknown>; lines: Record<string, unknown>[] } | null> {
+): Promise<{ docEntry: number; docNum: number; header: Record<string, unknown>; lines: Record<string, unknown>[] } | null> => {
   const endpoint = SAP_ENDPOINTS[bizObjectId]
   if (!endpoint) return null
   const docEntry = await findDocEntry(endpoint, docNum, sessionId)
@@ -358,12 +356,12 @@ export interface SourceDocLines {
  *
  * headerOverrides: any header fields to set on the new document (e.g. CardCode)
  */
-export async function copyDocument(
+export const copyDocument = async (
   sources: SourceDocLines[],
   targetObjectId: string,
   headerOverrides: Record<string, unknown>,
   sessionId: string,
-): Promise<{ docNum: number; docEntry: number }> {
+): Promise<{ docNum: number; docEntry: number }> => {
   const targetEndpoint = SAP_ENDPOINTS[targetObjectId]
   if (!targetEndpoint) throw new Error(`No SAP endpoint for target object "${targetObjectId}"`)
 
@@ -397,7 +395,7 @@ export async function copyDocument(
  * Validates all documents locally and against SAP master data
  * without writing anything to SAP.
  */
-export async function runSapTest(
+export const runSapTest = async (
   bizObjectId: string,
   docFile: UploadedFile,
   linesFile: UploadedFile,
@@ -405,7 +403,7 @@ export async function runSapTest(
   sessionId: string,
   onProgress: ProgressCallback,
   copyFrom?: CopyFromState | null,
-): Promise<ImportResult> {
+): Promise<ImportResult> => {
   const endpoint = SAP_ENDPOINTS[bizObjectId]
   const errors: ImportResult['errors'] = []
 
@@ -494,6 +492,91 @@ export async function runSapTest(
 
 // ─── Real import ───────────────────────────────────────────────────────────
 
+/** Sequential processor used by cancel_rollback mode. */
+const runSapImportSequential = async (
+  endpoint: string,
+  groups: Array<{ docRow: Record<string, unknown>; lineRows: Record<string, unknown>[] }>,
+  mappings: MappingRow[],
+  sessionId: string,
+  total: number,
+  onProgress: ProgressCallback,
+  copyFrom?: CopyFromState | null,
+): Promise<ImportResult> => {
+  const errors: ImportResult['errors'] = []
+  const createdDocEntries: number[] = []
+  let successCount = 0
+  let lastDocNum: string | undefined
+
+  for (let i = 0; i < groups.length; i++) {
+    const { docRow, lineRows } = groups[i]
+    const { payload, docNum } = buildPayload(docRow, lineRows, mappings, copyFrom)
+
+    onProgress({
+      current: i + 1, total,
+      phase: 'importing',
+      action: `Processing document ${i + 1} of ${total}`,
+      successCount,
+      failedCount: errors.length,
+    })
+
+    try {
+      let resultDocNum: string | undefined
+
+      if (docNum !== null) {
+        const existingEntry = await findDocEntry(endpoint, docNum, sessionId)
+        if (existingEntry !== null) {
+          const patchBody = { ...payload }
+          delete patchBody['DocNum']
+          delete patchBody['Handwritten']
+          await sapPatch(endpoint, existingEntry, patchBody, sessionId)
+          resultDocNum = String(docNum)
+        } else {
+          const result = await sapPost<{ DocEntry?: number; DocNum?: number }>(endpoint, payload, sessionId)
+          if (result.DocEntry) createdDocEntries.push(result.DocEntry)
+          resultDocNum = result.DocNum !== undefined ? String(result.DocNum) : String(docNum)
+        }
+      } else {
+        const result = await sapPost<{ DocEntry?: number; DocNum?: number }>(endpoint, payload, sessionId)
+        if (result.DocEntry) createdDocEntries.push(result.DocEntry)
+        resultDocNum = result.DocNum !== undefined ? String(result.DocNum) : undefined
+      }
+
+      successCount++
+      if (resultDocNum) lastDocNum = resultDocNum
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown SAP error'
+      errors.push({ row: i + 1, field: 'Document', message })
+      console.error(`[SAP] Error on document ${i + 1}:`, message)
+
+      // Rollback all created docs then stop
+      if (createdDocEntries.length > 0) {
+        onProgress({
+          current: i + 1, total,
+          phase: 'rolling_back',
+          action: `Rolling back ${createdDocEntries.length} document(s)…`,
+          successCount, failedCount: errors.length,
+        })
+        await Promise.all(createdDocEntries.map(entry => sapCancel(endpoint, entry, sessionId)))
+        successCount = 0
+      }
+      break
+    }
+  }
+
+  const status: ImportResult['status'] = errors.length > 0 ? 'failed' : 'success'
+
+  return {
+    mode: 'import', status,
+    totalRecords: total,
+    successCount,
+    failedCount: total - successCount,
+    errors,
+    sapReference: lastDocNum,
+    timestamp: new Date().toISOString(),
+  }
+}
+
 /**
  * Posts documents to SAP B1 Service Layer.
  *
@@ -511,7 +594,7 @@ export async function runSapTest(
  *   cancel_rollback uses sequential (concurrency = 1) so rollback is clean and
  *   deterministic. The other two modes use concurrency = 5 for throughput.
  */
-export async function runSapImport(
+export const runSapImport = async (
   bizObjectId: string,
   docFile: UploadedFile,
   linesFile: UploadedFile,
@@ -520,7 +603,7 @@ export async function runSapImport(
   errorHandling: ErrorHandlingMode,
   onProgress: ProgressCallback,
   copyFrom?: CopyFromState | null,
-): Promise<ImportResult> {
+): Promise<ImportResult> => {
   const endpoint = SAP_ENDPOINTS[bizObjectId]
 
   if (!endpoint) {
@@ -606,91 +689,6 @@ export async function runSapImport(
   const lastDocNum = [...lastDocNums].reverse().find(v => v !== undefined)
   const status: ImportResult['status'] =
     errors.length === 0 ? 'success' : successCount === 0 ? 'failed' : 'partial'
-
-  return {
-    mode: 'import', status,
-    totalRecords: total,
-    successCount,
-    failedCount: total - successCount,
-    errors,
-    sapReference: lastDocNum,
-    timestamp: new Date().toISOString(),
-  }
-}
-
-/** Sequential processor used by cancel_rollback mode. */
-async function runSapImportSequential(
-  endpoint: string,
-  groups: Array<{ docRow: Record<string, unknown>; lineRows: Record<string, unknown>[] }>,
-  mappings: MappingRow[],
-  sessionId: string,
-  total: number,
-  onProgress: ProgressCallback,
-  copyFrom?: CopyFromState | null,
-): Promise<ImportResult> {
-  const errors: ImportResult['errors'] = []
-  const createdDocEntries: number[] = []
-  let successCount = 0
-  let lastDocNum: string | undefined
-
-  for (let i = 0; i < groups.length; i++) {
-    const { docRow, lineRows } = groups[i]
-    const { payload, docNum } = buildPayload(docRow, lineRows, mappings, copyFrom)
-
-    onProgress({
-      current: i + 1, total,
-      phase: 'importing',
-      action: `Processing document ${i + 1} of ${total}`,
-      successCount,
-      failedCount: errors.length,
-    })
-
-    try {
-      let resultDocNum: string | undefined
-
-      if (docNum !== null) {
-        const existingEntry = await findDocEntry(endpoint, docNum, sessionId)
-        if (existingEntry !== null) {
-          const patchBody = { ...payload }
-          delete patchBody['DocNum']
-          delete patchBody['Handwritten']
-          await sapPatch(endpoint, existingEntry, patchBody, sessionId)
-          resultDocNum = String(docNum)
-        } else {
-          const result = await sapPost<{ DocEntry?: number; DocNum?: number }>(endpoint, payload, sessionId)
-          if (result.DocEntry) createdDocEntries.push(result.DocEntry)
-          resultDocNum = result.DocNum !== undefined ? String(result.DocNum) : String(docNum)
-        }
-      } else {
-        const result = await sapPost<{ DocEntry?: number; DocNum?: number }>(endpoint, payload, sessionId)
-        if (result.DocEntry) createdDocEntries.push(result.DocEntry)
-        resultDocNum = result.DocNum !== undefined ? String(result.DocNum) : undefined
-      }
-
-      successCount++
-      if (resultDocNum) lastDocNum = resultDocNum
-
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown SAP error'
-      errors.push({ row: i + 1, field: 'Document', message })
-      console.error(`[SAP] Error on document ${i + 1}:`, message)
-
-      // Rollback all created docs then stop
-      if (createdDocEntries.length > 0) {
-        onProgress({
-          current: i + 1, total,
-          phase: 'rolling_back',
-          action: `Rolling back ${createdDocEntries.length} document(s)…`,
-          successCount, failedCount: errors.length,
-        })
-        await Promise.all(createdDocEntries.map(entry => sapCancel(endpoint, entry, sessionId)))
-        successCount = 0
-      }
-      break
-    }
-  }
-
-  const status: ImportResult['status'] = errors.length > 0 ? 'failed' : 'success'
 
   return {
     mode: 'import', status,

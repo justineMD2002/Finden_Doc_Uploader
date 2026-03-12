@@ -23,7 +23,7 @@ const VALID_DOCUMENT_TYPES = ['INVOICE', 'CREDIT_NOTE', 'PO', 'GOODS_RECEIPT']
 const VALID_UNITS = ['EA', 'KG', 'BOX', 'PC', 'L', 'M']
 const VALID_CURRENCIES = ['PHP', 'USD', 'EUR', 'SGD', 'JPY', 'CNY', 'AUD', 'GBP']
 
-function validateRow(row: Record<string, unknown>, rowIndex: number): ValidationError[] {
+const validateRow = (row: Record<string, unknown>, rowIndex: number): ValidationError[] => {
   const errors: ValidationError[] = []
   const r = rowIndex + 2 // 1-based + header row
 
@@ -113,7 +113,7 @@ function validateRow(row: Record<string, unknown>, rowIndex: number): Validation
   return errors
 }
 
-export function parseFile(file: File): Promise<ParseResult> {
+export const parseFile = (file: File): Promise<ParseResult> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
 
@@ -185,7 +185,7 @@ export function parseFile(file: File): Promise<ParseResult> {
   })
 }
 
-export function downloadTemplate() {
+export const downloadTemplate = () => {
   const headers: (keyof DocumentRow)[] = [
     'vendor_code', 'document_date', 'document_type', 'document_number', 'po_number',
     'line_item', 'material_code', 'description', 'quantity', 'unit',

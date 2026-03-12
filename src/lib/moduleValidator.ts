@@ -323,12 +323,12 @@ export interface ModuleValidationResult {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function isBlank(v: unknown): boolean {
+const isBlank = (v: unknown): boolean => {
   if (v === null || v === undefined) return true
   return String(v).trim() === ''
 }
 
-function isValidDate(v: unknown): boolean {
+const isValidDate = (v: unknown): boolean => {
   if (v instanceof Date) return !isNaN(v.getTime())
   const s = String(v).trim()
   if (!s) return false
@@ -341,23 +341,23 @@ function isValidDate(v: unknown): boolean {
   return false
 }
 
-function isInteger(v: unknown): boolean {
+const isInteger = (v: unknown): boolean => {
   if (isBlank(v)) return false
   const n = Number(v)
   return !isNaN(n) && Number.isFinite(n) && Math.floor(n) === n
 }
 
-function isDecimalOrNumeric(v: unknown): boolean {
+const isDecimalOrNumeric = (v: unknown): boolean => {
   if (isBlank(v)) return false
   const n = Number(v)
   return !isNaN(n) && Number.isFinite(n)
 }
 
-function validateCell(
+const validateCell = (
   col: ColDef,
   rawValue: unknown,
   rowNum: number,
-): ModuleValidationError | null {
+): ModuleValidationError | null => {
   const blank = isBlank(rawValue)
   const displayVal = blank ? '(empty)' : String(rawValue)
 
@@ -416,7 +416,7 @@ function validateCell(
 
 // ─── Sheet names helper ────────────────────────────────────────────────────
 
-export function getSheetNames(file: File): Promise<string[]> {
+export const getSheetNames = (file: File): Promise<string[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -434,11 +434,11 @@ export function getSheetNames(file: File): Promise<string[]> {
 
 // ─── Main validator ────────────────────────────────────────────────────────
 
-export function validateModuleFile(
+export const validateModuleFile = (
   file: File,
   module: ModuleDef,
   sheetName?: string,
-): Promise<ModuleValidationResult> {
+): Promise<ModuleValidationResult> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
 

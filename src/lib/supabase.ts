@@ -32,12 +32,12 @@ export interface ImportLogRow {
   created_at?: string
 }
 
-export async function insertImportLog(log: Omit<ImportLogRow, 'id' | 'created_at'>): Promise<void> {
+export const insertImportLog = async (log: Omit<ImportLogRow, 'id' | 'created_at'>): Promise<void> => {
   const { error } = await supabase.from('import_logs').insert(log)
   if (error) throw error
 }
 
-export async function fetchImportLogs(userEmail?: string): Promise<ImportLogRow[]> {
+export const fetchImportLogs = async (userEmail?: string): Promise<ImportLogRow[]> => {
   let query = supabase
     .from('import_logs')
     .select('*')

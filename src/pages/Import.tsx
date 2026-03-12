@@ -33,16 +33,16 @@ import { getCopyFromSources, getBizObjectLabel } from '@/lib/copyRelations'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function categoryIcon(id: BizCategory) {
+const categoryIcon = (id: BizCategory) => {
   if (id === 'sales')      return <TrendingUp className="w-5 h-5" />
   if (id === 'purchasing') return <ShoppingCart className="w-5 h-5" />
   return <Package className="w-5 h-5" />
 }
 
-async function readFile(
+const readFile = async (
   file: File,
   sheetName?: string,
-): Promise<{ columns: string[]; rowCount: number; rows: Record<string, unknown>[] }> {
+): Promise<{ columns: string[]; rowCount: number; rows: Record<string, unknown>[] }> => {
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, { cellDates: true })
   const name = sheetName ?? wb.SheetNames[0]
@@ -54,14 +54,14 @@ async function readFile(
 }
 
 
-async function getSheetNames(file: File): Promise<string[]> {
+const getSheetNames = async (file: File): Promise<string[]> => {
   const buf = await file.arrayBuffer()
   const wb = XLSX.read(buf, { sheetRows: 1 })
   return wb.SheetNames
 }
 
 
-function buildFallbackMappings(docCols: string[], linesCols: string[]): MappingRow[] {
+const buildFallbackMappings = (docCols: string[], linesCols: string[]): MappingRow[] => {
   return [
     ...docCols.map(c => ({ sourceField: c, targetField: '', tab: 'doc' as const })),
     ...linesCols.map(c => ({ sourceField: c, targetField: '', tab: 'lines' as const })),
@@ -72,7 +72,7 @@ function buildFallbackMappings(docCols: string[], linesCols: string[]): MappingR
 
 const STEP_LABELS = ['Business Object', 'Upload Files', 'Field Mapping', 'Error Handling', 'Import']
 
-function WizardProgress({ step }: { step: WizardStep }) {
+const WizardProgress = ({ step }: { step: WizardStep }) => {
   return (
     <div className="flex items-center gap-0">
       {STEP_LABELS.map((label, i) => {
@@ -110,7 +110,7 @@ function WizardProgress({ step }: { step: WizardStep }) {
 
 // ─── Copy From Panel ───────────────────────────────────────────────────────
 
-function CopyFromPanel({
+const CopyFromPanel = ({
   targetId,
   copyFrom,
   onChange,
@@ -118,7 +118,7 @@ function CopyFromPanel({
   targetId: string
   copyFrom: CopyFromState | null
   onChange: (state: CopyFromState | null) => void
-}) {
+}) => {
   const sources = getCopyFromSources(targetId)
   const { session } = useSap()
   const [open, setOpen] = useState(false)
@@ -129,7 +129,7 @@ function CopyFromPanel({
 
   if (sources.length === 0) return null
 
-  async function handleLookup() {
+  const handleLookup = async () => {
     const n = parseInt(docNumInput, 10)
     if (isNaN(n) || n <= 0) return
     if (!session) return
@@ -154,7 +154,7 @@ function CopyFromPanel({
     }
   }
 
-  function handleClear() {
+  const handleClear = () => {
     onChange(null)
     setDocNumInput('')
     setNotFound(false)
@@ -253,7 +253,7 @@ function CopyFromPanel({
 
 // ─── Step 1 — Business Object ──────────────────────────────────────────────
 
-function StepBusinessObject({
+const StepBusinessObject = ({
   selected, onSelect, onNext, copyFrom, onCopyFromChange,
 }: {
   selected: BizObject | null
@@ -261,7 +261,7 @@ function StepBusinessObject({
   onNext: () => void
   copyFrom: CopyFromState | null
   onCopyFromChange: (state: CopyFromState | null) => void
-}) {
+}) => {
   return (
     <div className="space-y-6">
       <div>
@@ -353,7 +353,7 @@ function StepBusinessObject({
 
 const ERRORS_PER_PAGE = 50
 
-function ValidationErrorTable({ errors }: { errors: CellValidationError[] }) {
+const ValidationErrorTable = ({ errors }: { errors: CellValidationError[] }) => {
   const [page, setPage] = useState(0)
   const totalPages = Math.ceil(errors.length / ERRORS_PER_PAGE)
   const slice = errors.slice(page * ERRORS_PER_PAGE, (page + 1) * ERRORS_PER_PAGE)
@@ -399,7 +399,7 @@ function ValidationErrorTable({ errors }: { errors: CellValidationError[] }) {
 
 // ─── Dropzone ──────────────────────────────────────────────────────────────
 
-function UploadDropzone({
+const UploadDropzone = ({
   label, uploaded, onFile, onRemove, disabled,
 }: {
   label: string
@@ -407,7 +407,7 @@ function UploadDropzone({
   onFile: (f: File) => void
   onRemove: () => void
   disabled?: boolean
-}) {
+}) => {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -468,7 +468,7 @@ function UploadDropzone({
 
 // ─── Columns preview ───────────────────────────────────────────────────────
 
-function ColumnsPreview({ columns }: { columns: string[] }) {
+const ColumnsPreview = ({ columns }: { columns: string[] }) => {
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Detected Columns</p>
@@ -483,7 +483,7 @@ function ColumnsPreview({ columns }: { columns: string[] }) {
 
 // ─── Step 2 — Upload Files ─────────────────────────────────────────────────
 
-function StepUploadFiles({
+const StepUploadFiles = ({
   bizObject, docFile, linesFile,
   docErrors, linesErrors,
   onBothFiles, onDocRemove, onLinesRemove,
@@ -499,7 +499,7 @@ function StepUploadFiles({
   onLinesRemove: () => void
   onNext: () => void
   onBack: () => void
-}) {
+}) => {
   const [activeTab, setActiveTab] = useState<'doc' | 'lines'>('doc')
   const [loading, setLoading] = useState(false)
   const [singleFile, setSingleFile] = useState<File | null>(null)
@@ -510,14 +510,14 @@ function StepUploadFiles({
   const totalErrors = docErrors.length + linesErrors.length
   const canProceed = bothLoaded && totalErrors === 0
 
-  function detectSheets(names: string[]): { doc: string; lines: string } | null {
+  const detectSheets = (names: string[]): { doc: string; lines: string } | null => {
     const linesSheet = names.find(n => /line/i.test(n))
     const docSheet = names.find(n => n !== linesSheet)
     if (!linesSheet || !docSheet) return null
     return { doc: docSheet, lines: linesSheet }
   }
 
-  async function handleSingleFile(f: File) {
+  const handleSingleFile = async (f: File) => {
     setLoading(true)
     try {
       const names = await getSheetNames(f)
@@ -544,7 +544,7 @@ function StepUploadFiles({
     }
   }
 
-  function handleClearSingle() {
+  const handleClearSingle = () => {
     setSingleFile(null)
     setDetectedSheets(null)
     onDocRemove()
@@ -638,67 +638,56 @@ function StepUploadFiles({
                   </p>
                 )}
               </div>
-              {!loading && (
-                <button onClick={handleClearSingle} className="p-1.5 rounded-lg hover:bg-brand-100 text-brand-700 transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+              <button onClick={handleClearSingle} className="p-1.5 rounded-lg hover:bg-brand-100 text-brand-600 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {loading && (
-              <div className="flex items-center gap-2 text-sm text-brand-600">
-                <Loader2 className="w-4 h-4 animate-spin" /> Reading data...
-              </div>
-            )}
-
-            {/* Sheet summaries */}
-            {bothLoaded && (
-              <div className="grid grid-cols-2 gap-3">
-                {([['doc', docLabel, docFile, docErrors], ['lines', linesLabel, linesFile, linesErrors]] as const).map(([role, label, file, errors]) => (
-                  <div key={role} className={cn('px-4 py-3 rounded-xl border', errors.length > 0 ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50')}>
-                    <p className="text-xs font-semibold text-gray-600 mb-1">{label}</p>
-                    {file && errors.length === 0 && (
-                      <p className="text-xs text-green-700 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> {file.rowCount} rows · {file.columns.length} columns
-                      </p>
+            {/* Tab bar */}
+            <div className="flex gap-0 border-b border-gray-200">
+              {([['doc', docLabel], ['lines', linesLabel]] as const).map(([tab, label]) => {
+                const count  = tab === 'doc' ? (docFile?.columns.length ?? 0) : (linesFile?.columns.length ?? 0)
+                const errors = tab === 'doc' ? docErrors.length : linesErrors.length
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={cn(
+                      'px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px',
+                      activeTab === tab ? 'border-brand-500 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700',
                     )}
-                    {errors.length > 0 && (
-                      <p className="text-xs text-red-600 flex items-center gap-1">
-                        <XCircle className="w-3 h-3" /> {errors.length} error{errors.length !== 1 ? 's' : ''}
-                      </p>
+                  >
+                    {label}
+                    {errors > 0 && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700">
+                        {errors} err
+                      </span>
                     )}
-                  </div>
-                ))}
-              </div>
-            )}
+                    {errors === 0 && count > 0 && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700">
+                        {count} cols
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
 
-            {/* Column preview / errors for active tab */}
-            {(docFile || linesFile) && (
-              <div className="space-y-3 border-t border-gray-100 pt-4">
-                <div className="flex gap-0 border-b border-gray-200">
-                  {([['doc', docLabel, docFile, docErrors], ['lines', linesLabel, linesFile, linesErrors]] as const).map(([tab, label, file, errs]) => file && (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={cn(
-                        'px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                        activeTab === tab
-                          ? errs.length > 0 ? 'border-red-500 text-red-700' : 'border-brand-500 text-brand-700'
-                          : 'border-transparent text-gray-500 hover:text-gray-700',
-                      )}
-                    >
-                      {label}
-                      {errs.length > 0 && <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-600 font-semibold">{errs.length}</span>}
-                    </button>
-                  ))}
-                </div>
-                {activeFile && activeErrors.length === 0 && <ColumnsPreview columns={activeFile.columns} />}
+            {/* Active tab content */}
+            {activeFile && (
+              <div className="space-y-3">
+                <ColumnsPreview columns={activeFile.columns} />
                 {activeErrors.length > 0 && (
                   <div className="space-y-2">
-                    <p className="text-sm font-semibold text-red-700 flex items-center gap-2">
-                      <XCircle className="w-4 h-4" /> {activeErrors.length} validation error{activeErrors.length !== 1 ? 's' : ''} — fix your file and re-upload
+                    <p className="text-xs font-semibold text-red-600 uppercase tracking-wide flex items-center gap-1.5">
+                      <XCircle className="w-3.5 h-3.5" /> {activeErrors.length} validation error{activeErrors.length !== 1 ? 's' : ''}
                     </p>
                     <ValidationErrorTable errors={activeErrors} />
+                  </div>
+                )}
+                {activeErrors.length === 0 && (
+                  <div className="flex items-center gap-2 text-xs text-green-600 font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> No errors found in this file
                   </div>
                 )}
               </div>
@@ -706,16 +695,6 @@ function StepUploadFiles({
           </div>
         )}
       </div>
-
-      {/* Errors block */}
-      {bothLoaded && totalErrors > 0 && (
-        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl">
-          <XCircle className="w-4 h-4 text-red-500 shrink-0" />
-          <p className="text-sm text-red-700">
-            <span className="font-semibold">{totalErrors} error{totalErrors !== 1 ? 's' : ''}</span> must be resolved before proceeding. Correct the data in your file and re-upload.
-          </p>
-        </div>
-      )}
 
       <div className="flex items-center justify-between pt-2">
         <button onClick={onBack} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 transition-all">
@@ -735,7 +714,7 @@ function StepUploadFiles({
 
 // ─── Field type badge ──────────────────────────────────────────────────────
 
-function FieldTypeBadge({ def }: { def: SapFieldDef }) {
+const FieldTypeBadge = ({ def }: { def: SapFieldDef }) => {
   const colorMap: Record<string, string> = {
     string: 'bg-sky-50 text-sky-700 border-sky-200',
     date:   'bg-violet-50 text-violet-700 border-violet-200',
@@ -752,7 +731,7 @@ function FieldTypeBadge({ def }: { def: SapFieldDef }) {
 
 // ─── Target field selector ─────────────────────────────────────────────────
 
-function TargetFieldSelect({
+const TargetFieldSelect = ({
   value,
   sapFields,
   onChange,
@@ -762,7 +741,7 @@ function TargetFieldSelect({
   sapFields: SapFieldDef[]
   onChange: (v: string) => void
   isUnknownBizObject: boolean
-}) {
+}) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -869,7 +848,7 @@ function TargetFieldSelect({
 
 // ─── Field detail tooltip row ──────────────────────────────────────────────
 
-function FieldDetails({ def }: { def: SapFieldDef }) {
+const FieldDetails = ({ def }: { def: SapFieldDef }) => {
   const chips: { label: string; className: string }[] = []
   if (def.fieldLength) chips.push({ label: `len: ${def.fieldLength}`, className: 'bg-gray-100 text-gray-600' })
   if (def.format)      chips.push({ label: def.format, className: 'bg-violet-50 text-violet-700' })
@@ -897,7 +876,7 @@ function FieldDetails({ def }: { def: SapFieldDef }) {
 
 // ─── Step 3 — Field Mapping ────────────────────────────────────────────────
 
-function StepFieldMapping({
+const StepFieldMapping = ({
   bizObject, mappings, onMappingChange, onNext, onBack,
 }: {
   bizObject: BizObject
@@ -905,14 +884,14 @@ function StepFieldMapping({
   onMappingChange: (updated: MappingRow[]) => void
   onNext: () => void
   onBack: () => void
-}) {
+}) => {
   const [activeTab, setActiveTab] = useState<'doc' | 'lines'>('doc')
   const [docLabel, linesLabel] = bizObject.tabLabels ?? ['Document', 'Document Lines']
 
   const config: BizObjectConfig | null = getBizObjectConfig(bizObject.id)
   const isUnknown = config === null
 
-  function handleAutoMap(overwrite: boolean) {
+  const handleAutoMap = (overwrite: boolean) => {
     if (!config) return
     const updated = reAutoMap(mappings, config, overwrite)
     const newlyMapped = updated.filter((r, i) => r.targetField && !mappings[i].targetField).length
@@ -929,7 +908,7 @@ function StepFieldMapping({
   const visible = mappings.filter(m => m.tab === activeTab)
   const sapFields = activeTab === 'doc' ? docFields : linesFields
 
-  function updateTarget(sourceField: string, tab: 'doc' | 'lines', value: string) {
+  const updateTarget = (sourceField: string, tab: 'doc' | 'lines', value: string) => {
     onMappingChange(
       mappings.map(m => m.tab === tab && m.sourceField === sourceField ? { ...m, targetField: value } : m)
     )
@@ -1182,14 +1161,14 @@ const ERROR_HANDLING_OPTIONS: {
   },
 ]
 
-function StepErrorHandling({
+const StepErrorHandling = ({
   errorHandling, onChange, onNext, onBack,
 }: {
   errorHandling: ErrorHandlingMode
   onChange: (v: ErrorHandlingMode) => void
   onNext: () => void
   onBack: () => void
-}) {
+}) => {
   return (
     <div className="space-y-6">
       <div>
@@ -1248,12 +1227,12 @@ function StepErrorHandling({
 
 // ─── Step 5 — Import ────────────────────────────────────────────────────────
 
-function errorHandlingLabel(mode: ErrorHandlingMode) {
+const errorHandlingLabel = (mode: ErrorHandlingMode) => {
   return ERROR_HANDLING_OPTIONS.find(o => o.value === mode)?.label ?? mode
 }
 
 
-function ImportResultPanel({
+const ImportResultPanel = ({
   result, onReset, onRunImport, onRetestImport, onCopyTo,
 }: {
   result: ImportResult
@@ -1261,7 +1240,7 @@ function ImportResultPanel({
   onRunImport?: () => void
   onRetestImport?: () => void
   onCopyTo?: () => void
-}) {
+}) => {
   const isTest = result.mode === 'test'
   const ok = result.status === 'success'
   const partial = result.status === 'partial'
@@ -1359,7 +1338,7 @@ function ImportResultPanel({
   )
 }
 
-function StepImport({
+const StepImport = ({
   bizObject, docFile, linesFile, mappings, errorHandling,
   copyFrom, result, onResult, onClearResult, onBack, onReset, onCopyTo,
 }: {
@@ -1375,14 +1354,14 @@ function StepImport({
   onBack: () => void
   onReset: () => void
   onCopyTo?: () => void
-}) {
+}) => {
   const [running,  setRunning]  = useState<'test' | 'import' | null>(null)
   const [progress, setProgress] = useState<ImportProgress | null>(null)
   const [docLabel, linesLabel]  = bizObject.tabLabels ?? ['Document', 'Document Lines']
   const mappedCount = mappings.filter(m => m.targetField.trim()).length
   const { session } = useSap()
 
-  async function run(mode: 'test' | 'import') {
+  const run = async (mode: 'test' | 'import') => {
     if (!session) {
       toast.error('No active SAP session', { description: 'Please reconnect to SAP from the company selector.' })
       return
@@ -1570,7 +1549,7 @@ function StepImport({
 
 // ─── Main page ─────────────────────────────────────────────────────────────
 
-export default function Import() {
+const Import = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -1621,19 +1600,19 @@ export default function Import() {
     })
   }, [step, bizObject, copyFrom, docFile, linesFile, mappings, errorHandling])
 
-  function buildMappings(docCols: string[], linesCols: string[], bizObj: BizObject | null) {
+  const buildMappings = (docCols: string[], linesCols: string[], bizObj: BizObject | null) => {
     const config = bizObj ? getBizObjectConfig(bizObj.id) : null
     return config
       ? applyAutoMap(docCols, linesCols, config)
       : buildFallbackMappings(docCols, linesCols)
   }
 
-  function runValidation(
+  const runValidation = (
     uploadedDoc: UploadedFile | null,
     uploadedLines: UploadedFile | null,
     currentMappings: MappingRow[],
     bizObj: BizObject | null,
-  ) {
+  ) => {
     const config = bizObj ? getBizObjectConfig(bizObj.id) : null
     if (!config) { setDocErrors([]); setLinesErrors([]); return }
 
@@ -1645,7 +1624,7 @@ export default function Import() {
     }
   }
 
-  function handleSelectBizObject(o: BizObject) {
+  const handleSelectBizObject = (o: BizObject) => {
     setBizObject(o)
     setCopyFrom(null)
     setDocFile(null)
@@ -1656,7 +1635,7 @@ export default function Import() {
     setResult(null)
   }
 
-  async function handleBothFiles(f: File, docSheet: string, linesSheet: string) {
+  const handleBothFiles = async (f: File, docSheet: string, linesSheet: string) => {
     const [docData, linesData] = await Promise.all([readFile(f, docSheet), readFile(f, linesSheet)])
     const docUploaded: UploadedFile = { file: f, columns: docData.columns, rowCount: docData.rowCount, rows: docData.rows }
     const linesUploaded: UploadedFile = { file: f, columns: linesData.columns, rowCount: linesData.rowCount, rows: linesData.rows }
@@ -1667,7 +1646,7 @@ export default function Import() {
     runValidation(docUploaded, linesUploaded, newMappings, bizObject)
   }
 
-  function handleReset() {
+  const handleReset = () => {
     clearWizardDraft()
     setStep(1)
     setBizObject(null)
@@ -1682,7 +1661,7 @@ export default function Import() {
   }
 
   // ── Handle import completion — set result + insert log if real import ────
-  async function handleImportComplete(r: ImportResult) {
+  const handleImportComplete = async (r: ImportResult) => {
     setResult(r)
 
     if (r.mode === 'import' && bizObject) {
@@ -1803,3 +1782,5 @@ export default function Import() {
     </div>
   )
 }
+
+export default Import

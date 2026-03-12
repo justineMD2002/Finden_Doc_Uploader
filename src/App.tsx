@@ -11,7 +11,7 @@ import Layout from '@/components/Layout'
 
 // ─── Guards ────────────────────────────────────────────────────────────────
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth()
   const { status } = useSap()
 
@@ -37,7 +37,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // ─── Routes ────────────────────────────────────────────────────────────────
 
-function AppRoutes() {
+const AppRoutes = () => {
   const { user } = useAuth()
   const { status } = useSap()
 
@@ -70,7 +70,7 @@ function AppRoutes() {
 
 // ─── App ───────────────────────────────────────────────────────────────────
 
-export default function App() {
+const App = () => {
   return (
     <BrowserRouter>
       <AuthProvider>
@@ -90,3 +90,5 @@ export default function App() {
     </BrowserRouter>
   )
 }
+
+export default App

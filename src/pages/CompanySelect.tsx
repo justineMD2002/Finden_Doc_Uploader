@@ -9,13 +9,13 @@ import { toast } from 'sonner'
 import findenLogo from '@/assets/finden_logo.png'
 import type { Company } from '@/types/document'
 
-export default function CompanySelect() {
+const CompanySelect = () => {
   const { connect, status, errorMessage } = useSap()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [selected, setSelected] = useState<Company | null>(null)
 
-  async function handleConnect(company: Company) {
+  const handleConnect = async (company: Company) => {
     setSelected(company)
     const ok = await connect(company)
     if (ok) {
@@ -26,7 +26,7 @@ export default function CompanySelect() {
     }
   }
 
-  function handleSignOut() {
+  const handleSignOut = () => {
     logout()
     navigate('/login')
   }
@@ -146,3 +146,5 @@ export default function CompanySelect() {
     </div>
   )
 }
+
+export default CompanySelect

@@ -1,11 +1,11 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
-export function cn(...inputs: ClassValue[]) {
+export const cn = (...inputs: ClassValue[]) => {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(dateStr: string): string {
+export const formatDate = (dateStr: string): string => {
   try {
     return new Date(dateStr).toLocaleDateString('en-PH', {
       year: 'numeric',
@@ -17,7 +17,7 @@ export function formatDate(dateStr: string): string {
   }
 }
 
-export function formatDateTime(dateStr: string): string {
+export const formatDateTime = (dateStr: string): string => {
   try {
     return new Date(dateStr).toLocaleString('en-PH', {
       year: 'numeric',
@@ -31,7 +31,7 @@ export function formatDateTime(dateStr: string): string {
   }
 }
 
-export function formatCurrency(amount: number, currency = 'PHP'): string {
+export const formatCurrency = (amount: number, currency = 'PHP'): string => {
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency,
@@ -39,6 +39,6 @@ export function formatCurrency(amount: number, currency = 'PHP'): string {
   }).format(amount)
 }
 
-export function generateId(): string {
+export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }

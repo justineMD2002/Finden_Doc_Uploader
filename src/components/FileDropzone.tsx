@@ -9,7 +9,21 @@ interface FileDropzoneProps {
   disabled?: boolean
 }
 
-export default function FileDropzone({ onFileSelect, selectedFile, onClear, disabled }: FileDropzoneProps) {
+const isValidFile = (file: File): boolean => {
+  return (
+    file.name.endsWith('.xlsx') ||
+    file.name.endsWith('.xls') ||
+    file.name.endsWith('.csv')
+  )
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const FileDropzone = ({ onFileSelect, selectedFile, onClear, disabled }: FileDropzoneProps) => {
   const [isDragging, setIsDragging] = useState(false)
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -33,20 +47,6 @@ export default function FileDropzone({ onFileSelect, selectedFile, onClear, disa
     const file = e.target.files?.[0]
     if (file && isValidFile(file)) onFileSelect(file)
     e.target.value = ''
-  }
-
-  function isValidFile(file: File): boolean {
-    return (
-      file.name.endsWith('.xlsx') ||
-      file.name.endsWith('.xls') ||
-      file.name.endsWith('.csv')
-    )
-  }
-
-  function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   if (selectedFile) {
@@ -109,3 +109,5 @@ export default function FileDropzone({ onFileSelect, selectedFile, onClear, disa
     </label>
   )
 }
+
+export default FileDropzone

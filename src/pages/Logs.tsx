@@ -17,11 +17,11 @@ const STATUS_CONFIG = {
 
 type StatusKey = keyof typeof STATUS_CONFIG
 
-function statusKey(log: ImportLogRow): StatusKey {
+const statusKey = (log: ImportLogRow): StatusKey => {
   return log.status.toUpperCase() as StatusKey
 }
 
-export default function Logs() {
+const Logs = () => {
   const { user } = useAuth()
   const [logs, setLogs] = useState<ImportLogRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -31,7 +31,7 @@ export default function Logs() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [justRefreshed, setJustRefreshed] = useState(false)
 
-  async function loadLogs() {
+  const loadLogs = async () => {
     try {
       const data = await fetchImportLogs(user?.email)
       setLogs(data)
@@ -41,7 +41,7 @@ export default function Logs() {
     }
   }
 
-  async function refresh() {
+  const refresh = async () => {
     setIsRefreshing(true)
     setJustRefreshed(false)
     try {
@@ -58,7 +58,7 @@ export default function Logs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function exportLogs() {
+  const exportLogs = () => {
     const data = filtered.map(log => ({
       ID: log.id ?? '',
       'Business Object': log.biz_object_label,
@@ -297,3 +297,5 @@ export default function Logs() {
     </div>
   )
 }
+
+export default Logs

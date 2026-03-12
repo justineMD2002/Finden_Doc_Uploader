@@ -4,7 +4,7 @@ import { Eye, EyeOff, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react
 import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
 
-export default function Login() {
+const Login = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
 
@@ -14,7 +14,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
@@ -162,3 +162,5 @@ export default function Login() {
     </div>
   )
 }
+
+export default Login

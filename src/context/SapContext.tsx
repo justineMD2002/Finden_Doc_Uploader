@@ -18,11 +18,11 @@ interface PersistedSapData {
   companyId: string  // used to look up the Company object from COMPANIES
 }
 
-function saveToStorage(session: SapSession, company: Company) {
+const saveToStorage = (session: SapSession, company: Company) => {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ session, companyId: company.id } satisfies PersistedSapData))
 }
 
-function loadFromStorage(): { session: SapSession; company: Company } | null {
+const loadFromStorage = (): { session: SapSession; company: Company } | null => {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY)
     if (!raw) return null
@@ -35,14 +35,14 @@ function loadFromStorage(): { session: SapSession; company: Company } | null {
   }
 }
 
-function clearStorage() {
+const clearStorage = () => {
   sessionStorage.removeItem(SESSION_KEY)
 }
 
 // ─── Auto-renew timing ─────────────────────────────────────────────────────
 // Renew 5 minutes before the SAP session timeout to avoid mid-request expiry.
 
-function renewIntervalMs(sessionTimeoutMinutes: number) {
+const renewIntervalMs = (sessionTimeoutMinutes: number) => {
   return Math.max((sessionTimeoutMinutes - 5) * 60 * 1000, 60_000)
 }
 
@@ -63,7 +63,7 @@ const SapContext = createContext<SapContextValue | null>(null)
 
 // ─── Provider ──────────────────────────────────────────────────────────────
 
-export function SapProvider({ children }: { children: ReactNode }) {
+export const SapProvider = ({ children }: { children: ReactNode }) => {
   const [session,      setSession]      = useState<SapSession | null>(null)
   const [company,      setCompany]      = useState<Company | null>(null)
   const [status,       setStatus]       = useState<SapStatus>('disconnected')
@@ -72,14 +72,14 @@ export function SapProvider({ children }: { children: ReactNode }) {
 
   // ── Timer helpers ─────────────────────────────────────────────────────────
 
-  function stopRenewTimer() {
+  const stopRenewTimer = () => {
     if (renewTimer.current) {
       clearInterval(renewTimer.current)
       renewTimer.current = null
     }
   }
 
-  function startRenewTimer(co: Company, sess: SapSession) {
+  const startRenewTimer = (co: Company, sess: SapSession) => {
     stopRenewTimer()
     const ms = renewIntervalMs(sess.sessionTimeout)
     console.log(`[SAP] Auto-renew in ${ms / 60000} min`)
@@ -179,7 +179,7 @@ export function SapProvider({ children }: { children: ReactNode }) {
 
 // ─── Hook ──────────────────────────────────────────────────────────────────
 
-export function useSap() {
+export const useSap = () => {
   const ctx = useContext(SapContext)
   if (!ctx) throw new Error('useSap must be used within SapProvider')
   return ctx

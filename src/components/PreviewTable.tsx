@@ -26,7 +26,7 @@ const COLUMNS: { key: keyof DocumentRow; label: string }[] = [
   { key: 'remarks', label: 'Remarks' },
 ]
 
-export default function PreviewTable({ rows, errors }: PreviewTableProps) {
+const PreviewTable = ({ rows, errors }: PreviewTableProps) => {
   const errorRowNumbers = new Set(errors.map(e => e.row))
   const errorMap = new Map<string, string>()
   errors.forEach(e => errorMap.set(`${e.row}-${e.column}`, e.message))
@@ -141,3 +141,5 @@ export default function PreviewTable({ rows, errors }: PreviewTableProps) {
     </div>
   )
 }
+
+export default PreviewTable

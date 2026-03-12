@@ -17,7 +17,7 @@ type PageState = 'idle' | 'sheet_select' | 'validating' | 'validated' | 'submitt
 
 // ─── Step badge ────────────────────────────────────────────────────────────
 
-function StepBadge({ n, active, done }: { n: number; active: boolean; done: boolean }) {
+const StepBadge = ({ n, active, done }: { n: number; active: boolean; done: boolean }) => {
   return (
     <span className={cn(
       'flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 transition-all',
@@ -42,7 +42,7 @@ interface SelectProps<T extends string> {
   icon?: React.ReactNode
 }
 
-function Select<T extends string>({ label, placeholder, options, value, onChange, disabled, icon }: SelectProps<T>) {
+const Select = <T extends string>({ label, placeholder, options, value, onChange, disabled, icon }: SelectProps<T>) => {
   const [open, setOpen] = useState(false)
   const selected = options.find(o => o.value === value)
 
@@ -97,7 +97,7 @@ function Select<T extends string>({ label, placeholder, options, value, onChange
 
 // ─── Dropzone ──────────────────────────────────────────────────────────────
 
-function Dropzone({ onFile, disabled }: { onFile: (f: File) => void; disabled?: boolean }) {
+const Dropzone = ({ onFile, disabled }: { onFile: (f: File) => void; disabled?: boolean }) => {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -151,7 +151,7 @@ function Dropzone({ onFile, disabled }: { onFile: (f: File) => void; disabled?: 
 
 // ─── Validation summary banner ─────────────────────────────────────────────
 
-function ValidationBanner({ result }: { result: ModuleValidationResult }) {
+const ValidationBanner = ({ result }: { result: ModuleValidationResult }) => {
   if (result.passed) {
     return (
       <div className="flex items-center gap-4 px-5 py-4 bg-green-50 border border-green-200 rounded-2xl">
@@ -192,7 +192,7 @@ function ValidationBanner({ result }: { result: ModuleValidationResult }) {
 
 // ─── Missing / extra columns panel ────────────────────────────────────────
 
-function ColumnIssuesPanel({ missing, extra }: { missing: string[]; extra: string[] }) {
+const ColumnIssuesPanel = ({ missing, extra }: { missing: string[]; extra: string[] }) => {
   if (missing.length === 0 && extra.length === 0) return null
   return (
     <div className="space-y-3">
@@ -226,7 +226,7 @@ function ColumnIssuesPanel({ missing, extra }: { missing: string[]; extra: strin
 
 // ─── Error table ───────────────────────────────────────────────────────────
 
-function ErrorTable({ errors }: { errors: ModuleValidationResult['errors'] }) {
+const ErrorTable = ({ errors }: { errors: ModuleValidationResult['errors'] }) => {
   const PAGE = 50
   const [page, setPage] = useState(0)
   const slice = errors.slice(page * PAGE, (page + 1) * PAGE)
@@ -276,7 +276,7 @@ function ErrorTable({ errors }: { errors: ModuleValidationResult['errors'] }) {
 
 // ─── Submit result card ────────────────────────────────────────────────────
 
-function ResultCard({ log, onUploadAnother }: { log: UploadLog; onUploadAnother: () => void }) {
+const ResultCard = ({ log, onUploadAnother }: { log: UploadLog; onUploadAnother: () => void }) => {
   const isSuccess = log.status === 'SUCCESS'
   const isPartial = log.status === 'PARTIAL'
 
@@ -336,7 +336,7 @@ function ResultCard({ log, onUploadAnother }: { log: UploadLog; onUploadAnother:
 
 // ─── Main page ─────────────────────────────────────────────────────────────
 
-export default function Validate() {
+const Validate = () => {
   const { user } = useAuth()
 
   const [pageState, setPageState] = useState<PageState>('idle')
@@ -353,20 +353,20 @@ export default function Validate() {
   const dbOptions = COMPANIES.map(c => ({ value: c.id, label: c.companyName, sub: c.databaseName }))
   const moduleOptions = MODULES.map(m => ({ value: m.id, label: m.label }))
 
-  function handleSelectDb(id: string) {
+  const handleSelectDb = (id: string) => {
     const company = COMPANIES.find(c => c.id === id) ?? null
     setSelectedCompany(company)
     setSelectedModule(null)
     resetFile()
   }
 
-  function handleSelectModule(id: string) {
+  const handleSelectModule = (id: string) => {
     const mod = MODULES.find(m => m.id === id) ?? null
     setSelectedModule(mod)
     resetFile()
   }
 
-  function resetFile() {
+  const resetFile = () => {
     setFile(null)
     setSheetNames([])
     setSelectedSheet(null)
@@ -377,13 +377,13 @@ export default function Validate() {
     setPageState('idle')
   }
 
-  function handleFullReset() {
+  const handleFullReset = () => {
     setSelectedCompany(null)
     setSelectedModule(null)
     resetFile()
   }
 
-  async function handleFile(f: File) {
+  const handleFile = async (f: File) => {
     if (!selectedModule) return
     setFile(f)
     setParseError(null)
@@ -407,7 +407,7 @@ export default function Validate() {
     }
   }
 
-  async function runValidation(f: File, sheet: string) {
+  const runValidation = async (f: File, sheet: string) => {
     if (!selectedModule) return
     setPageState('validating')
     try {
@@ -427,7 +427,7 @@ export default function Validate() {
     }
   }
 
-  async function handleSubmit() {
+  const handleSubmit = async () => {
     if (!file || !selectedCompany || !selectedModule || !user) return
     setPageState('submitting')
 
@@ -716,3 +716,5 @@ export default function Validate() {
     </div>
   )
 }
+
+export default Validate

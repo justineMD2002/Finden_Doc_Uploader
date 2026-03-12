@@ -18,7 +18,7 @@ const navItems = [
 
 // ─── Profile drawer ────────────────────────────────────────────────────────
 
-function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+const ProfileDrawer = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
   const { user, updateUser, logout, changePassword } = useAuth()
   const navigate = useNavigate()
 
@@ -45,7 +45,7 @@ function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }
     }
   }, [open, user])
 
-  async function handleSave() {
+  const handleSave = async () => {
     if (!name.trim() || !email.trim()) return
     setSaving(true)
     await new Promise(res => setTimeout(res, 500)) // simulate async
@@ -54,14 +54,14 @@ function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }
     toast.success('Profile updated')
   }
 
-  function handleSignOut() {
+  const handleSignOut = () => {
     logout()
     toast.success('Logged out successfully')
     navigate('/login')
     onClose()
   }
 
-  async function handleChangePassword() {
+  const handleChangePassword = async () => {
     if (newPw.length < 6) { toast.error('Password must be at least 6 characters'); return }
     if (newPw !== confirmPw) { toast.error('Passwords do not match'); return }
     setPwSaving(true)
@@ -223,7 +223,7 @@ function ProfileDrawer({ open, onClose }: { open: boolean; onClose: () => void }
 
 // ─── User dropdown ─────────────────────────────────────────────────────────
 
-function UserMenu() {
+const UserMenu = () => {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -231,14 +231,14 @@ function UserMenu() {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    const handleClickOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  function handleSignOut() {
+  const handleSignOut = () => {
     setOpen(false)
     logout()
     toast.success('Logged out successfully')
@@ -293,11 +293,11 @@ function UserMenu() {
 
 // ─── SAP company badge ─────────────────────────────────────────────────────
 
-function SapBadge() {
+const SapBadge = () => {
   const { company, disconnect } = useSap()
   const navigate = useNavigate()
 
-  async function handleSwitch() {
+  const handleSwitch = async () => {
     await disconnect()
     navigate('/select-company')
   }
@@ -324,7 +324,7 @@ function SapBadge() {
 
 // ─── Layout ────────────────────────────────────────────────────────────────
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
@@ -378,3 +378,5 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
+
+export default Layout
