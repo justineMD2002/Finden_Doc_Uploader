@@ -23,7 +23,7 @@ const SAP_ENDPOINTS: Record<string, string> = {
   po:             'PurchaseOrders',
   ap_invoice:     'PurchaseInvoices',
   ap_downpayment: 'PurchaseDownPayments',
-  grpo:           'GoodsReceiptsPO',
+  grpo:           'PurchaseDeliveryNotes',
   ar_invoice:     'Invoices',
   ar_credit_memo: 'CreditNotes',
   delivery:       'DeliveryNotes',
@@ -156,7 +156,7 @@ async function findDocEntry(
   sessionId: string,
 ): Promise<number | null> {
   const data = await sapGet<{ value: Array<{ DocEntry: number }> }>(
-    `${endpoint}?$filter=DocNum eq ${docNum}&$select=DocEntry,DocNum&$top=1`,
+    `${endpoint}?$filter=DocNum%20eq%20${docNum}&$select=DocEntry,DocNum&$top=1`,
     sessionId,
   )
   if (data?.value?.length) return data.value[0].DocEntry
@@ -367,15 +367,17 @@ export async function copyDocument(
   const targetEndpoint = SAP_ENDPOINTS[targetObjectId]
   if (!targetEndpoint) throw new Error(`No SAP endpoint for target object "${targetObjectId}"`)
 
-  // Build flat DocumentLines array — each line tagged with its source
+  // Build DocumentLines — only BaseType/BaseEntry/BaseLine needed; SAP copies
+  // all other line data from the source document automatically.
+  // BaseLine = source LineNum (not array index) in case lines were deleted.
   const DocumentLines: Record<string, unknown>[] = []
   for (const src of sources) {
     src.lines.forEach((line, idx) => {
+      const baseLine = typeof line['LineNum'] === 'number' ? line['LineNum'] : idx
       DocumentLines.push({
-        ...line,
         BaseType:  src.sourceObjectType,
         BaseEntry: src.sourceDocEntry,
-        BaseLine:  idx,
+        BaseLine:  baseLine,
       })
     })
   }
