@@ -1,13 +1,17 @@
 import { useState, useEffect, Fragment } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronRight,
-  RefreshCw, Search, FileDown, ClipboardList, Loader2,
+  RefreshCw, Search, FileDown, ClipboardList, Loader2, GitMerge,
 } from 'lucide-react'
 import { fetchImportLogs, type ImportLogRow } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { cn, formatDateTime, formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
+import { COPY_FROM_EDGES } from '@/lib/copyRelations'
+
+const VALID_COPY_SOURCES = new Set(Object.values(COPY_FROM_EDGES).flat())
 
 const STATUS_CONFIG = {
   SUCCESS: { label: 'Success', icon: CheckCircle2, cls: 'bg-green-100 text-green-700', dot: 'bg-green-400' },
@@ -23,6 +27,7 @@ const statusKey = (log: ImportLogRow): StatusKey => {
 
 const Logs = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [logs, setLogs] = useState<ImportLogRow[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -268,6 +273,21 @@ const Logs = () => {
                           </div>
                         ))}
                       </div>
+
+                      {VALID_COPY_SOURCES.has(log.biz_object_id) && log.sap_reference && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              navigate('/copy', { state: { sourceObjectId: log.biz_object_id, docNum: log.sap_reference } })
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-brand-50 border border-brand-200 text-brand-700 rounded-lg hover:bg-brand-100 transition-colors"
+                          >
+                            <GitMerge className="w-3.5 h-3.5" />
+                            Copy Document
+                          </button>
+                        </div>
+                      )}
 
                       {log.errors.length > 0 && (
                         <div className="bg-white rounded-lg border border-red-100 p-3">

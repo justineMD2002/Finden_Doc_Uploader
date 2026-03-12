@@ -33,12 +33,26 @@ const getCopyToTargets = (sourceId: string): string[] => {
     .map(([target]) => target)
 }
 
+type DocOpenStatus = 'open' | 'partial' | 'closed'
+
+const getDocOpenStatus = (doc: { header: Record<string, unknown>; lines: Record<string, unknown>[] }): DocOpenStatus => {
+  if (doc.header['DocumentStatus'] === 'bost_Close') return 'closed'
+  const openLines = doc.lines.filter(l => {
+    const oq = l['OpenQuantity'] ?? l['RemainingOpenQuantity']
+    return typeof oq === 'number' ? oq > 0 : true // if field absent assume open
+  })
+  if (openLines.length === 0 && doc.lines.length > 0) return 'closed'
+  if (openLines.length < doc.lines.length) return 'partial'
+  return 'open'
+}
+
 interface FetchedDoc {
   docEntry: number
   docNum: number
   header: Record<string, unknown>
   lines: Record<string, unknown>[]
   expanded: boolean
+  openStatus: DocOpenStatus
 }
 
 interface CopyResult {
@@ -48,6 +62,12 @@ interface CopyResult {
   error?: string
   sourceCount: number
   targetLabel: string
+}
+
+const OPEN_STATUS_BADGE: Record<DocOpenStatus, { label: string; cls: string }> = {
+  open:    { label: 'Open',     cls: 'bg-green-100 text-green-700' },
+  partial: { label: 'Partial',  cls: 'bg-amber-100 text-amber-700' },
+  closed:  { label: 'Closed',   cls: 'bg-red-100 text-red-700' },
 }
 
 const SourceDocRow = ({
@@ -73,6 +93,9 @@ const SourceDocRow = ({
             : <ChevronRight className="w-4 h-4 text-gray-400" />}
           <span className="text-brand-700">{getBizObjectLabel(sourceObjectId)}</span>
           <span className="text-gray-500">#{doc.docNum}</span>
+          <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', OPEN_STATUS_BADGE[doc.openStatus].cls)}>
+            {OPEN_STATUS_BADGE[doc.openStatus].label}
+          </span>
           <span className="text-xs font-normal text-gray-400 ml-1">
             — DocEntry {doc.docEntry} · {doc.lines.length} line{doc.lines.length !== 1 ? 's' : ''}
           </span>
@@ -128,6 +151,7 @@ const Copy = () => {
   const validSourceIds = getValidSourceIds()
   const hasSession     = !!session
   const copyTargets    = sourceObjectId ? getCopyToTargets(sourceObjectId) : []
+  const hasClosedDocs  = sourceDocs.some(d => d.openStatus === 'closed')
 
   // Auto-fetch if navigated here from Import result screen
   useEffect(() => {
@@ -150,7 +174,17 @@ const Copy = () => {
         toast.error('Document not found', { description: `No ${getBizObjectLabel(srcId)} with DocNum ${num} in SAP.` })
         return
       }
-      setSourceDocs(prev => [...prev, { ...doc, expanded: true }])
+      const openStatus = getDocOpenStatus(doc)
+      if (openStatus === 'closed') {
+        toast.warning(`${getBizObjectLabel(srcId)} #${num} is fully closed`, {
+          description: 'All lines have been fully received/invoiced. Copying it will duplicate already-processed quantities.',
+        })
+      } else if (openStatus === 'partial') {
+        toast.info(`${getBizObjectLabel(srcId)} #${num} is partially closed`, {
+          description: 'Some lines have already been fully received/invoiced and will still be included in the copy.',
+        })
+      }
+      setSourceDocs(prev => [...prev, { ...doc, expanded: true, openStatus }])
       setDocNumInput('')
     } catch (err) {
       toast.error('Fetch failed', { description: err instanceof Error ? err.message : 'Unknown error' })
@@ -185,6 +219,31 @@ const Copy = () => {
 
   const handleCopy = async () => {
     if (!sourceObjectId || sourceDocs.length === 0 || !targetObjectId || !session) return
+
+    // Validate all source docs have matching header fields required by SAP
+    if (sourceDocs.length > 1) {
+      const MUST_MATCH: { field: string; label: string }[] = [
+        { field: 'CardCode',         label: 'Business Partner (CardCode)' },
+        { field: 'DocCurrency',      label: 'Currency' },
+        { field: 'PaymentGroupCode', label: 'Payment Terms' },
+        { field: 'ShipToCode',       label: 'Ship-To Address' },
+        { field: 'BillToCode',       label: 'Bill-To Address' },
+      ]
+      const mismatches: string[] = []
+      for (const { field, label } of MUST_MATCH) {
+        const values = [...new Set(sourceDocs.map(d => d.header[field]).filter(v => v !== undefined && v !== null && v !== ''))]
+        if (values.length > 1) {
+          mismatches.push(`${label}: ${values.join(' vs ')}`)
+        }
+      }
+      if (mismatches.length > 0) {
+        toast.error('Source documents are incompatible', {
+          description: mismatches.join(' · '),
+          duration: 8000,
+        })
+        return
+      }
+    }
 
     // Each source doc carries its own BaseEntry — this is what creates the SAP relation chain
     const sources: SourceDocLines[] = sourceDocs.map(doc => ({
@@ -380,6 +439,31 @@ const Copy = () => {
                       onRemove={() => handleRemoveDoc(doc.docNum)}
                       onToggle={() => toggleExpanded(doc.docNum)} />
                   ))}
+                  {(() => {
+                    if (sourceDocs.length < 2) return null
+                    const MUST_MATCH: { field: string; label: string }[] = [
+                      { field: 'CardCode',         label: 'Business Partner' },
+                      { field: 'DocCurrency',      label: 'Currency' },
+                      { field: 'PaymentGroupCode', label: 'Payment Terms' },
+                      { field: 'ShipToCode',       label: 'Ship-To' },
+                      { field: 'BillToCode',       label: 'Bill-To' },
+                    ]
+                    const mismatches = MUST_MATCH.flatMap(({ field, label }) => {
+                      const values = [...new Set(sourceDocs.map(d => d.header[field]).filter(v => v !== undefined && v !== null && v !== ''))]
+                      return values.length > 1 ? [`${label} (${values.join(' vs ')})`] : []
+                    })
+                    return mismatches.length > 0 ? (
+                      <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-semibold mb-1">Incompatible source documents — copy will be blocked:</p>
+                          <ul className="space-y-0.5 list-disc list-inside">
+                            {mismatches.map(m => <li key={m}>{m}</li>)}
+                          </ul>
+                        </div>
+                      </div>
+                    ) : null
+                  })()}
                   <div className="flex items-center gap-2 text-xs text-gray-500 px-1">
                     <GitMerge className="w-3.5 h-3.5 text-brand-400" />
                     {sourceDocs.reduce((s, d) => s + d.lines.length, 0)} total lines from {sourceDocs.length} document{sourceDocs.length !== 1 ? 's' : ''}{' '}
@@ -464,8 +548,18 @@ const Copy = () => {
                 </div>
               )}
 
+              {hasClosedDocs && (
+                <div className="flex items-start gap-2 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold">Cannot copy — closed documents included</p>
+                    <p className="mt-0.5 text-red-600">One or more source documents are fully closed (all quantities received/invoiced). Remove them to proceed.</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end">
-                <button onClick={handleCopy} disabled={!targetObjectId || copying}
+                <button onClick={handleCopy} disabled={!targetObjectId || copying || hasClosedDocs}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm">
                   {copying ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}
                   {copying
