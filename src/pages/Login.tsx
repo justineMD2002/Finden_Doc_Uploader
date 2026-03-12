@@ -48,8 +48,8 @@ const Login = () => {
         <div className="space-y-6">
           <div className="space-y-3">
             <h1 className="text-4xl font-bold text-white leading-tight">
-              Document Uploader<br />
-              <span className="text-brand-200">for SAP B1 Integration</span>
+              SAP B1<br />
+              <span className="text-brand-200">Data Transfer Workbench - Web</span>
             </h1>
             <p className="text-brand-200 text-lg leading-relaxed max-w-md">
               Upload your invoices, purchase orders, and financial documents directly to SAP B1 with real-time validation and full audit logs.
