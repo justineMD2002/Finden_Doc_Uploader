@@ -39,10 +39,10 @@ const Login = () => {
       {/* Left panel - branding */}
       <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur">
+          {/* <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center backdrop-blur">
             <FileSpreadsheet className="w-6 h-6 text-white" />
-          </div>
-          <span className="text-white font-semibold text-lg">Finden SAP B1 Web Document Uploader</span>
+          </div> */}
+          <span className="text-white font-semibold text-lg">Finden Technologies Inc.</span>
         </div>
 
         <div className="space-y-6">
