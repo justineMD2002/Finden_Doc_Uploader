@@ -363,7 +363,7 @@ const Copy = () => {
         </div>
         {(sourceObjectId || sourceDocs.length > 0) && (
           <button onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors whitespace-nowrap shrink-0">
             <RotateCcw className="w-3.5 h-3.5" /> Start Over
           </button>
         )}
